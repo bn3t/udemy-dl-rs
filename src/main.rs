@@ -36,7 +36,7 @@ struct Asset {
     filename: String,
     asset_type: String,
     time_estimation: u64,
-    download_urls: Vec<DownloadUrl>,
+    download_urls: Option<Vec<DownloadUrl>>,
 }
 #[derive(Serialize, Deserialize, Debug)]
 struct Lecture {
@@ -124,23 +124,17 @@ impl UdemyDownloader {
         )?;
         let captures = re
             .captures(url)
-            .ok_or(format_err!("Could not parse provide url <{}>", url))?;
+            .ok_or_else(|| format_err!("Could not parse provide url <{}>", url))?;
         let course_name = String::from(
             captures
                 .name("course_name")
-                .ok_or(format_err!(
-                    "Could not compute course name out of url <{}>",
-                    url
-                ))?
+                .ok_or_else(|| format_err!("Could not compute course name out of url <{}>", url))?
                 .as_str(),
         );
         let portal_name = String::from(
             captures
                 .name("portal_name")
-                .ok_or(format_err!(
-                    "Could not compute portal name out of url <{}>",
-                    url
-                ))?
+                .ok_or_else(|| format_err!("Could not compute portal name out of url <{}>", url))?
                 .as_str(),
         );
         let host = format!("{portal_name}.udemy.com", portal_name = portal_name);
@@ -159,9 +153,9 @@ impl UdemyDownloader {
     fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error> {
         let results = subscribed_courses
             .get("results")
-            .ok_or(format_err!("Error parsing json"))?
+            .ok_or_else(|| format_err!("Error parsing json"))?
             .as_array()
-            .ok_or(format_err!("Error parsing json"))?;
+            .ok_or_else(|| format_err!("Error parsing json"))?;
         // println!("results={:?}", results);
         let courses: Vec<Course> = results
             .into_iter()
@@ -173,9 +167,9 @@ impl UdemyDownloader {
     }
 
     fn parse_assets(&self, value: &Value) -> Result<Vec<Asset>, Error> {
-        let assets = value.as_array().ok_or(format_err!("Error parsing json"))?;
-
-        println!("assets={:?}", assets);
+        let assets = value
+            .as_array()
+            .ok_or_else(|| format_err!("Error parsing json"))?;
 
         let assets: Vec<Asset> = assets
             .into_iter()
@@ -187,20 +181,41 @@ impl UdemyDownloader {
     }
 
     fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
-        let filename: String = asset.get("filename").unwrap().as_str().unwrap().into();
-        let asset_type: String = asset.get("asset_type").unwrap().as_str().unwrap().into();
-        let time_estimation: u64 = asset.get("time_estimation").unwrap().as_u64().unwrap();
-        let download_urls = asset.get("download_urls").unwrap();
+        let filename: String = asset
+            .get("filename")
+            .ok_or_else(|| format_err!("Error parsing json"))?
+            .as_str()
+            .ok_or_else(|| format_err!("Error parsing json"))?
+            .into();
+        let asset_type: String = asset
+            .get("asset_type")
+            .ok_or_else(|| format_err!("Error parsing json"))?
+            .as_str()
+            .ok_or_else(|| format_err!("Error parsing json"))?
+            .into();
+        let time_estimation: u64 = asset
+            .get("time_estimation")
+            .ok_or_else(|| format_err!("Error parsing json"))?
+            .as_u64()
+            .ok_or_else(|| format_err!("Error parsing json"))?;
+        let download_urls = asset
+            .get("download_urls")
+            .ok_or_else(|| format_err!("Error parsing json"))?;
         let download_urls = if let Some(video) = download_urls.get("Video") {
             Some(video)
         } else if let Some(filee) = download_urls.get("File") {
             Some(filee)
         } else {
+            println!("Unkonwn filetype {:?}", asset);
             None
         };
 
-        let download_urls: Vec<DownloadUrl> =
-            serde_json::from_value::<Vec<DownloadUrl>>(download_urls.unwrap().clone()).unwrap();
+        // println!("download_urls={:?}", download_urls);
+        let download_urls: Option<Vec<DownloadUrl>> = if let Some(dl_urls) = download_urls {
+            Some(serde_json::from_value::<Vec<DownloadUrl>>(dl_urls.clone()).unwrap())
+        } else {
+            None
+        };
         Ok(Asset {
             filename,
             asset_type,
@@ -209,12 +224,12 @@ impl UdemyDownloader {
         })
     }
 
-    fn parse_full_course(&self, full_course: &Value) -> Result<CourseContent, Error> {
+    fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error> {
         let results = full_course
             .get("results")
-            .ok_or(format_err!("Error parsing json"))?
+            .ok_or_else(|| format_err!("Error parsing json"))?
             .as_array()
-            .ok_or(format_err!("Error parsing json"))?;
+            .ok_or_else(|| format_err!("Error parsing json"))?;
 
         let mut chapters: Vec<Chapter> = Vec::new();
         let mut lectures: Vec<Lecture> = Vec::new();
@@ -228,17 +243,34 @@ impl UdemyDownloader {
                     chapters.push(this_chapter);
                 }
                 current_chapter = Some(Chapter {
-                    title: String::from(item.get("title").unwrap().as_str().unwrap()),
+                    title: String::from(
+                        item.get("title")
+                            .ok_or_else(|| format_err!("Error parsing json"))?
+                            .as_str()
+                            .ok_or_else(|| format_err!("Error parsing json"))?,
+                    ),
                     lectures: Vec::new(),
                 });
                 lectures = Vec::new();
             }
             if item.get("_class").unwrap() == "lecture" {
-                let asset = self.parse_asset(item.get("asset").unwrap())?;
+                let asset = self.parse_asset(
+                    item.get("asset")
+                        .ok_or_else(|| format_err!("Error parsing json"))?,
+                )?;
+                let supplementary_assets = self.parse_assets(
+                    item.get("supplementary_assets")
+                        .ok_or_else(|| format_err!("Error parsing json"))?,
+                )?;
                 lectures.push(Lecture {
-                    title: String::from(item.get("title").unwrap().as_str().unwrap()),
+                    title: String::from(
+                        item.get("title")
+                            .ok_or_else(|| format_err!("Error parsing json"))?
+                            .as_str()
+                            .ok_or_else(|| format_err!("Error parsing json"))?,
+                    ),
                     asset,
-                    supplementary_assets: Vec::new(),
+                    supplementary_assets,
                 });
             }
         }
@@ -248,6 +280,37 @@ impl UdemyDownloader {
             chapters.push(this_chapter);
         }
         Ok(CourseContent { chapters: chapters })
+    }
+
+    fn print_course_content(&self, course_content: &CourseContent) -> () {
+        for chapter in course_content.chapters.iter() {
+            println!("Chapter {}", chapter.title);
+            for lecture in chapter.lectures.iter() {
+                println!("\tLecture {}", lecture.title);
+                println!("\t\tFilename {}", lecture.asset.filename);
+                println!("\t\tAsset Type {}", lecture.asset.asset_type);
+                println!("\t\tTime estimation {}", lecture.asset.time_estimation);
+                if let Some(download_urls) = lecture.asset.download_urls.as_ref() {
+                    for url in download_urls.iter() {
+                        println!("\t\t\tUrl {}", url.file);
+                        println!("\t\t\tType {:?}", url.r#type);
+                        println!("\t\t\tLabel {}", url.label);
+                    }
+                }
+                for asset in lecture.supplementary_assets.iter() {
+                    println!("\t\tSuppl Filename {}", asset.filename);
+                    println!("\t\tSuppl Asset Type {}", asset.asset_type);
+                    println!("\t\tSuppl Time estimation {}", asset.time_estimation);
+                    if let Some(download_urls) = asset.download_urls.as_ref() {
+                        for url in download_urls.iter() {
+                            println!("\t\t\tUrl {}", url.file);
+                            println!("\t\t\tType {:?}", url.r#type);
+                            println!("\t\t\tLabel {}", url.label);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     pub fn info(&self) -> Result<String, Error> {
@@ -262,23 +325,17 @@ impl UdemyDownloader {
             .parse_subscribed_courses(&value)?
             .into_iter()
             .find(|course| course.published_title == self.course_name)
-            .ok_or(format_err!(
-                "{} was not found in subscribed courses",
-                self.course_name
-            ))?;
+            .ok_or_else(|| {
+                format_err!("{} was not found in subscribed courses", self.course_name)
+            })?;
 
         let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000",
         portal_name = self.portal_name, course_id=course.id);
 
         let value = self.client.get(url.as_str())?;
-        let course = self.parse_full_course(&value)?;
+        let course_content = self.parse_course_content(&value)?;
 
-        // for chapter in course.chapters.iter() {
-        //     println!("Chapter {}", chapter.title);
-        //     for lecture in chapter.lectures.iter() {
-        //         println!("\tLecture {}", lecture.title);
-        //     }
-        // }
+        self.print_course_content(&course_content);
 
         Ok(String::from("Info"))
     }
@@ -400,7 +457,7 @@ mod test_udemy_downloader {
     }
 
     #[test]
-    fn parse_full_course() {
+    fn parse_course_content() {
         let full_course: Value = serde_json::from_str(TEST_FULL_COURSE).unwrap();
 
         let dl = UdemyDownloader::new(
@@ -410,7 +467,7 @@ mod test_udemy_downloader {
         )
         .unwrap();
 
-        let actual = dl.parse_full_course(&full_course);
+        let actual = dl.parse_course_content(&full_course);
 
         assert_eq!(actual.is_ok(), true);
         let course_content = actual.unwrap();
@@ -425,6 +482,16 @@ mod test_udemy_downloader {
         assert_eq!(course_content.chapters[0].lectures.len(), 2);
         assert_eq!(course_content.chapters[0].lectures[0].title, "Introduction");
         assert_eq!(course_content.chapters[0].lectures[1].title, "What is CSS?");
+        assert_eq!(
+            course_content.chapters[0].lectures[1]
+                .supplementary_assets
+                .len(),
+            1
+        );
+        assert_eq!(
+            course_content.chapters[0].lectures[1].supplementary_assets[0].asset_type,
+            "File"
+        );
     }
 
     #[test]
@@ -445,14 +512,24 @@ mod test_udemy_downloader {
         assert_eq!(asset.filename, "getting-started-01-welcome.mp4");
         assert_eq!(asset.asset_type, "Video");
         assert_eq!(asset.time_estimation, 99);
-        assert_eq!(asset.download_urls.len(), 4);
-        assert_eq!(asset.download_urls[0].r#type.is_some(), true);
-        assert_eq!(asset.download_urls[0].r#type.as_ref().unwrap(), "video/mp4");
-        assert_eq!(asset.download_urls[0].file, "https://udemy-assets-on-demand2.udemy.com/2018-03-16_18-03-45-cb7a7f9f7ce092310d2ba43b50b0d2b8/WebHD_720p.mp4?nva=20190204223948&filename=getting-started-01-welcome.mp4&download=True&token=068ae457bbe97231de938");
-        assert_eq!(asset.download_urls[0].label, "720");
-        assert_eq!(asset.download_urls[1].label, "480");
-        assert_eq!(asset.download_urls[2].label, "360");
-        assert_eq!(asset.download_urls[3].label, "144");
+        assert_eq!(asset.download_urls.is_some(), true);
+        assert_eq!(asset.download_urls.as_ref().unwrap().len(), 4);
+        assert_eq!(
+            asset.download_urls.as_ref().unwrap()[0].r#type.is_some(),
+            true
+        );
+        assert_eq!(
+            asset.download_urls.as_ref().unwrap()[0]
+                .r#type
+                .as_ref()
+                .unwrap(),
+            "video/mp4"
+        );
+        assert_eq!(asset.download_urls.as_ref().unwrap()[0].file, "https://udemy-assets-on-demand2.udemy.com/2018-03-16_18-03-45-cb7a7f9f7ce092310d2ba43b50b0d2b8/WebHD_720p.mp4?nva=20190204223948&filename=getting-started-01-welcome.mp4&download=True&token=068ae457bbe97231de938");
+        assert_eq!(asset.download_urls.as_ref().unwrap()[0].label, "720");
+        assert_eq!(asset.download_urls.as_ref().unwrap()[1].label, "480");
+        assert_eq!(asset.download_urls.as_ref().unwrap()[2].label, "360");
+        assert_eq!(asset.download_urls.as_ref().unwrap()[3].label, "144");
     }
     #[test]
     fn parse_assets() {
