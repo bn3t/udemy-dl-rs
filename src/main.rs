@@ -1,5 +1,8 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
+use std::thread;
+use std::time::Duration;
+
 use regex::Regex;
 
 use reqwest::header::{
@@ -40,6 +43,7 @@ struct Asset {
 }
 #[derive(Serialize, Deserialize, Debug)]
 struct Lecture {
+    object_index: u64,
     title: String,
     asset: Asset,
     supplementary_assets: Vec<Asset>,
@@ -47,6 +51,7 @@ struct Lecture {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Chapter {
+    object_index: u64,
     title: String,
     lectures: Vec<Lecture>,
 }
@@ -156,7 +161,6 @@ impl UdemyDownloader {
             .ok_or_else(|| format_err!("Error parsing json"))?
             .as_array()
             .ok_or_else(|| format_err!("Error parsing json"))?;
-        // println!("results={:?}", results);
         let courses: Vec<Course> = results
             .into_iter()
             .map(|result| serde_json::from_value(result.clone()))
@@ -206,11 +210,10 @@ impl UdemyDownloader {
         } else if let Some(filee) = download_urls.get("File") {
             Some(filee)
         } else {
-            println!("Unkonwn filetype {:?}", asset);
+            // println!("Unkonwn filetype {:?}", asset);
             None
         };
 
-        // println!("download_urls={:?}", download_urls);
         let download_urls: Option<Vec<DownloadUrl>> = if let Some(dl_urls) = download_urls {
             Some(serde_json::from_value::<Vec<DownloadUrl>>(dl_urls.clone()).unwrap())
         } else {
@@ -243,6 +246,11 @@ impl UdemyDownloader {
                     chapters.push(this_chapter);
                 }
                 current_chapter = Some(Chapter {
+                    object_index: item
+                        .get("object_index")
+                        .ok_or_else(|| format_err!("Error parsing json"))?
+                        .as_u64()
+                        .ok_or_else(|| format_err!("Error parsing json"))?,
                     title: String::from(
                         item.get("title")
                             .ok_or_else(|| format_err!("Error parsing json"))?
@@ -263,6 +271,11 @@ impl UdemyDownloader {
                         .ok_or_else(|| format_err!("Error parsing json"))?,
                 )?;
                 lectures.push(Lecture {
+                    object_index: item
+                        .get("object_index")
+                        .ok_or_else(|| format_err!("Error parsing json"))?
+                        .as_u64()
+                        .ok_or_else(|| format_err!("Error parsing json"))?,
                     title: String::from(
                         item.get("title")
                             .ok_or_else(|| format_err!("Error parsing json"))?
@@ -284,9 +297,9 @@ impl UdemyDownloader {
 
     fn print_course_content(&self, course_content: &CourseContent) -> () {
         for chapter in course_content.chapters.iter() {
-            println!("Chapter {}", chapter.title);
+            println!("{:03} Chapter {}", chapter.object_index, chapter.title);
             for lecture in chapter.lectures.iter() {
-                println!("\tLecture {}", lecture.title);
+                println!("\t{:03} Lecture {}", lecture.object_index, lecture.title);
                 println!("\t\tFilename {}", lecture.asset.filename);
                 println!("\t\tAsset Type {}", lecture.asset.asset_type);
                 println!("\t\tTime estimation {}", lecture.asset.time_estimation);
@@ -313,7 +326,7 @@ impl UdemyDownloader {
         }
     }
 
-    pub fn info(&self) -> Result<String, Error> {
+    fn extract(&self) -> Result<CourseContent, Error> {
         println!("Requesting info");
         let url = format!(
             "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}",
@@ -321,6 +334,7 @@ impl UdemyDownloader {
             course_name = self.course_name
         );
         let value = self.client.get(url.as_str())?;
+        let detail = value.get("detail");
         let course = self
             .parse_subscribed_courses(&value)?
             .into_iter()
@@ -334,10 +348,57 @@ impl UdemyDownloader {
 
         let value = self.client.get(url.as_str())?;
         let course_content = self.parse_course_content(&value)?;
+        Ok(course_content)
+    }
 
+    pub fn info(&self) -> Result<(), Error> {
+        let course_content = self.extract()?;
         self.print_course_content(&course_content);
+        Ok(())
+    }
 
-        Ok(String::from("Info"))
+    pub fn download(
+        &self,
+        wanted_chapter: Option<u64>,
+        wanted_lecture: Option<u64>,
+        dry_run: bool,
+    ) -> Result<(), Error> {
+        println!(
+            "Downloadi request chapter: {:?}, lecture: {:?}, dry_run: {}",
+            wanted_chapter, wanted_lecture, dry_run
+        );
+        let course_content = self.extract()?;
+
+        for chapter in course_content.chapters {
+            if wanted_chapter.is_none() || wanted_chapter.unwrap() == chapter.object_index {
+                println!(
+                    "Downloading chapter {} - {}",
+                    chapter.object_index, chapter.title
+                );
+                for lecture in chapter.lectures {
+                    if wanted_lecture.is_none() || wanted_lecture.unwrap() == lecture.object_index {
+                        println!(
+                            "Downloading lecture {} - {}",
+                            lecture.object_index, lecture.title
+                        );
+                        if lecture.asset.asset_type == "Video" {
+                            if let Some(download_urls) = lecture.asset.download_urls {
+                                for url in download_urls {
+                                    if url.label == "720" {
+                                        println!("\tGetting {}", url.file);
+                                        if !dry_run {
+                                            thread::sleep(Duration::from_millis(3000));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -383,6 +444,33 @@ fn main() {
                 .help("Sets the level of verbosity"),
         )
         .subcommand(SubCommand::with_name("info").about("Query course information"))
+        .subcommand(
+            SubCommand::with_name("download")
+                .about("Download course content")
+                .arg(
+                    Arg::with_name("dry-run")
+                        .short("d")
+                        .long("dry-run")
+                        .takes_value(false)
+                        .help("Dry run, show what's would be done but don't download anything"),
+                )
+                .arg(
+                    Arg::with_name("chapter")
+                        .short("c")
+                        .long("chapter")
+                        .takes_value(true)
+                        .value_name("CHAPTER")
+                        .help("Restrict downloads to a specific chapter"),
+                )
+                .arg(
+                    Arg::with_name("lecture")
+                        .short("l")
+                        .long("lecture")
+                        .value_name("LECTURE")
+                        .takes_value(true)
+                        .help("Restrict download to a specific lecture"),
+                ),
+        )
         .get_matches();
 
     let url = matches.value_of("url").unwrap();
@@ -398,6 +486,19 @@ fn main() {
                 matches.value_of("url").unwrap()
             );
             udemy_downloader.info().map(|r| ())
+        }
+        ("download", Some(sub_m)) => {
+            println!("Downloading from {}", matches.value_of("url").unwrap());
+            let wanted_chapter = sub_m
+                .value_of("chapter")
+                .map(|v| v.parse::<u64>().ok().unwrap_or(0));
+            let wanted_lecture = sub_m
+                .value_of("lecture")
+                .map(|v| v.parse::<u64>().ok().unwrap_or(0));
+            let dry_run = sub_m.is_present("dry-run");
+
+            // Ok(())
+            udemy_downloader.download(wanted_chapter, wanted_lecture, dry_run)
         }
         _ => Ok(()),
     };
@@ -473,6 +574,7 @@ mod test_udemy_downloader {
         let course_content = actual.unwrap();
         assert_eq!(course_content.chapters.len(), 2);
 
+        assert_eq!(course_content.chapters[0].object_index, 1);
         assert_eq!(course_content.chapters[0].title, "Getting Started");
         assert_eq!(
             course_content.chapters[1].title,
@@ -480,6 +582,7 @@ mod test_udemy_downloader {
         );
 
         assert_eq!(course_content.chapters[0].lectures.len(), 2);
+        assert_eq!(course_content.chapters[0].lectures[0].object_index, 1);
         assert_eq!(course_content.chapters[0].lectures[0].title, "Introduction");
         assert_eq!(course_content.chapters[0].lectures[1].title, "What is CSS?");
         assert_eq!(
@@ -545,16 +648,5 @@ mod test_udemy_downloader {
         let actual = dl.parse_assets(&assets);
 
         assert_eq!(actual.is_ok(), true);
-        // let asset = actual.unwrap();
-        // assert_eq!(asset.filename, "getting-started-01-welcome.mp4");
-        // assert_eq!(asset.asset_type, "Video");
-        // assert_eq!(asset.time_estimation, 99);
-        // assert_eq!(asset.download_urls.len(), 4);
-        // assert_eq!(asset.download_urls[0].r#type, "video/mp4");
-        // assert_eq!(asset.download_urls[0].file, "https://udemy-assets-on-demand2.udemy.com/2018-03-16_18-03-45-cb7a7f9f7ce092310d2ba43b50b0d2b8/WebHD_720p.mp4?nva=20190204223948&filename=getting-started-01-welcome.mp4&download=True&token=068ae457bbe97231de938");
-        // assert_eq!(asset.download_urls[0].label, "720");
-        // assert_eq!(asset.download_urls[1].label, "480");
-        // assert_eq!(asset.download_urls[2].label, "360");
-        // assert_eq!(asset.download_urls[3].label, "144");
     }
 }
