@@ -189,19 +189,25 @@ impl<'a> UdemyDownloader<'a> {
         );
         let course_content = self.extract()?;
 
-        for chapter in course_content.chapters {
-            if wanted_chapter.is_none() || wanted_chapter.unwrap() == chapter.object_index {
-                println!(
-                    "Downloading chapter {} - {}",
-                    chapter.object_index, chapter.title
-                );
-                for lecture in chapter.lectures {
-                    if wanted_lecture.is_none() || wanted_lecture.unwrap() == lecture.object_index {
-                        println!(
-                            "Downloading lecture {} - {}",
-                            lecture.object_index, lecture.title
-                        );
-                        if lecture.asset.asset_type == "Video" {
+        course_content
+            .chapters
+            .into_iter()
+            .for_each(move |chapter| {
+                if wanted_chapter.is_none() || wanted_chapter.unwrap() == chapter.object_index {
+                    println!(
+                        "Downloading chapter {} - {}",
+                        chapter.object_index, chapter.title
+                    );
+
+                    chapter
+                        .lectures
+                        .into_iter()
+                        .filter(|lecture| lecture.asset.asset_type == "Video")
+                        .filter(|lecture| {
+                            wanted_lecture.is_none()
+                                || wanted_lecture.unwrap() == lecture.object_index
+                        })
+                        .for_each(move |lecture| {
                             if let Some(download_urls) = lecture.asset.download_urls {
                                 for url in download_urls {
                                     if url.label == "720" {
@@ -212,12 +218,9 @@ impl<'a> UdemyDownloader<'a> {
                                     }
                                 }
                             }
-                        }
-                    }
+                        });
                 }
-            }
-        }
-
+            });
         Ok(())
     }
 }
