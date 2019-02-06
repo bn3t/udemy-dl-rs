@@ -1,4 +1,4 @@
-use failure::{format_err, Error, Fail};
+use failure::{format_err, Error};
 use serde_json::Value;
 
 use crate::model::*;
@@ -159,7 +159,7 @@ mod test_udemy_downloader {
 
     use super::UdemyParser;
     use crate::test_data::*;
-    use serde_json::{Result as JsonResult, Value};
+    use serde_json::Value;
 
     #[test]
     fn parse_subscribed_courses() {

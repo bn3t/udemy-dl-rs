@@ -1,21 +1,18 @@
-#![allow(dead_code, unused_imports, unused_variables)]
+#![allow(dead_code)]
 
 use std::thread;
 use std::time::Duration;
 
 use regex::Regex;
 
-use reqwest::header::{
-    HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, COOKIE, HOST, REFERER, USER_AGENT,
-};
-use reqwest::{Client, Response, StatusCode};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, USER_AGENT};
+use reqwest::Client;
 
-use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
 
 use clap::{App, AppSettings, Arg, SubCommand};
 
-use failure::{format_err, Error, Fail};
+use failure::{format_err, Error};
 
 mod model;
 mod parser;
@@ -32,21 +29,36 @@ const COURSE_SEARCH: &str = "https://{portal_name}.udemy.com/api-2.0/users/me/su
 struct UdemyHttpClient {
     access_token: String,
     client_id: String,
-    _host: String,
-    _referer: String,
     client: Client,
 }
 
+trait HttpClient {
+    fn get(&self, url: &str) -> Result<Value, Error>;
+}
+
+impl HttpClient for UdemyHttpClient {
+    fn get(&self, url: &str) -> Result<Value, Error> {
+        let mut resp = self
+            .client
+            .get(url)
+            .headers(self.construct_headers())
+            .send()?;
+        if resp.status().is_success() {
+            Ok(resp.json()?)
+        } else {
+            Err(format_err!("Error while getting from url <{}>", url))
+        }
+    }
+}
+
 impl UdemyHttpClient {
-    pub fn new(access_token: &str, client_id: &str, host: &str, referer: &str) -> UdemyHttpClient {
+    pub fn new(access_token: &str, client_id: &str) -> UdemyHttpClient {
         let client = Client::new();
 
         UdemyHttpClient {
             client: client,
             access_token: String::from(access_token),
             client_id: String::from(client_id),
-            _host: String::from(host),
-            _referer: String::from(referer),
         }
     }
 
@@ -64,33 +76,19 @@ impl UdemyHttpClient {
         headers.insert(USER_AGENT, HeaderValue::from_str(DEFAULT_UA).unwrap());
         headers
     }
-
-    pub fn get(&self, url: &str) -> Result<Value, Error> {
-        let mut resp = self
-            .client
-            .get(url)
-            .headers(self.construct_headers())
-            .send()?;
-        if resp.status().is_success() {
-            Ok(resp.json()?)
-        } else {
-            Err(format_err!("Error while getting from url <{}>", url))
-        }
-    }
 }
 
-struct UdemyDownloader {
+struct UdemyDownloader<'a> {
     course_name: String,
     portal_name: String,
-
-    client: UdemyHttpClient,
     parser: UdemyParser,
+    client: &'a HttpClient,
 }
 
 type CourseId = u64;
 
-impl UdemyDownloader {
-    pub fn new(url: &str, access_token: &str, client_id: &str) -> Result<UdemyDownloader, Error> {
+impl<'a> UdemyDownloader<'a> {
+    pub fn new(url: &str, client: &'a HttpClient) -> Result<UdemyDownloader<'a>, Error> {
         let re = Regex::new(
             r"(?i)(?://(?P<portal_name>.+?).udemy.com/(?P<course_name>[a-zA-Z0-9_-]+))",
         )?;
@@ -109,16 +107,10 @@ impl UdemyDownloader {
                 .ok_or_else(|| format_err!("Could not compute portal name out of url <{}>", url))?
                 .as_str(),
         );
-        let host = format!("{portal_name}.udemy.com", portal_name = portal_name);
-        let referer = format!(
-            "https://{portal_name}.udemy.com/home/my-courses/search/?q={course_name}",
-            portal_name = portal_name,
-            course_name = course_name
-        );
         Ok(UdemyDownloader {
             course_name,
             portal_name,
-            client: UdemyHttpClient::new(access_token, client_id, host.as_str(), referer.as_str()),
+            client,
             parser: UdemyParser::new(),
         })
     }
@@ -162,7 +154,6 @@ impl UdemyDownloader {
             course_name = self.course_name
         );
         let value = self.client.get(url.as_str())?;
-        let detail = value.get("detail");
         let course = self
             .parser
             .parse_subscribed_courses(&value)?
@@ -230,8 +221,6 @@ impl UdemyDownloader {
         Ok(())
     }
 }
-
-trait HttpClient {}
 
 fn main() {
     let matches = App::new("Udemy Downloader")
@@ -306,15 +295,16 @@ fn main() {
     let access_token = matches.value_of("access_token").unwrap();
     let client_id = matches.value_of("client_id").unwrap();
 
-    let udemy_downloader = UdemyDownloader::new(url, access_token, client_id).unwrap();
+    let client = UdemyHttpClient::new(access_token, client_id);
+    let udemy_downloader = UdemyDownloader::new(url, &client).unwrap();
 
     let result: Result<(), Error> = match matches.subcommand() {
-        ("info", Some(sub_m)) => {
+        ("info", Some(_sub_m)) => {
             println!(
                 "Request information from {}",
                 matches.value_of("url").unwrap()
             );
-            udemy_downloader.info().map(|r| ())
+            udemy_downloader.info().map(|_r| ())
         }
         ("download", Some(sub_m)) => {
             println!("Downloading from {}", matches.value_of("url").unwrap());
@@ -341,13 +331,24 @@ fn main() {
 mod test_udemy_downloader {
 
     use super::UdemyDownloader;
+    use crate::HttpClient;
+    use failure::Error;
+    use serde_json::{json, Value};
+
+    struct MockHttpClient {}
+
+    impl HttpClient for MockHttpClient {
+        fn get(&self, _url: &str) -> Result<Value, Error> {
+            Ok(json!({ "an": "object" }))
+        }
+    }
 
     #[test]
     fn parse_url() {
+        let mock_http_client = MockHttpClient {};
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
-            "acctok",
-            "clid",
+            &mock_http_client,
         )
         .unwrap();
 
