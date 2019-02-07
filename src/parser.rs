@@ -5,11 +5,14 @@ use crate::model::*;
 
 pub struct UdemyParser {}
 
+/// Parser for json data coming from udemy.
 impl UdemyParser {
+    /// New an instance of this struct.
     pub fn new() -> UdemyParser {
         UdemyParser {}
     }
 
+    /// Parse subscribed courses for this user.
     pub fn parse_subscribed_courses(
         &self,
         subscribed_courses: &Value,
@@ -28,6 +31,7 @@ impl UdemyParser {
         Ok(courses)
     }
 
+    /// Parse assets from the full course data.
     pub fn parse_assets(&self, value: &Value) -> Result<Vec<Asset>, Error> {
         let assets = value
             .as_array()
@@ -42,6 +46,7 @@ impl UdemyParser {
         Ok(assets)
     }
 
+    /// Parse json from a specific asset.
     pub fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
         let filename: String = asset
             .get("filename")
@@ -85,6 +90,7 @@ impl UdemyParser {
         })
     }
 
+    /// Parse full course content.
     pub fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error> {
         let results = full_course
             .get("results")
