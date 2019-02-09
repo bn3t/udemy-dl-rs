@@ -1,40 +1,86 @@
-image: 'rust:latest'
-
 stages:
+  - docker
   - test
-  - doc
-  - build
-
-variables:
-  CARGO_HOME: $CI_PROJECT_DIR/cargo
-  APT_CACHE_DIR: $CI_PROJECT_DIR/apt
-
-before_script:
-  - apt-get update -yq
-  - apt-get install -o dir::cache::archives="$APT_CACHE_DIR" -y {{ DEPENDENCIES }}
-
-test:
-  stage: test
+  
+docker:
+  only:
+    - schedules
+  image: docker:latest
+  services:
+    - docker:dind
+  stage: docker
   script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - cd ci/docker/rust
+    - docker build --no-cache -t registry.gitlab.com/dzamlo/gitlab-ci-rust-test/rust:latest .
+    - docker push registry.gitlab.com/dzamlo/gitlab-ci-rust-test/rust:latest
+
+.rust_test_template: &rust_test_template
+  stage: test
+  image: "registry.gitlab.com/dzamlo/gitlab-ci-rust-test/rust:latest"
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME"
+    paths:
+      - cargo/
+      - target/
+  before_script:
+    - export CARGO_HOME="$CI_PROJECT_DIR/cargo"
+    - rustup --version
     - rustc --version
     - cargo --version
-    - cargo build
-    - cargo test --verbose
-
-pages:
-  stage: doc
   script:
-    - cargo doc --no-deps
-    - mv target/doc public
-    - echo '<meta http-equiv="refresh" content="0; url={{ LIBRARY NAME }}">' > public/index.html
-  artifacts:
-    paths:
-      - public
-  only:
-    - master
+    - cargo test --all --verbose
 
-cache:
-  paths:
-    - apt/
-    - cargo/
-    - target/
+test-stable:
+  <<: *rust_test_template
+  variables:
+    RUSTUP_TOOLCHAIN: stable
+    
+test-beta:
+  <<: *rust_test_template
+  variables:
+    RUSTUP_TOOLCHAIN: beta
+
+test-nightly:
+  <<: *rust_test_template
+  variables:
+    RUSTUP_TOOLCHAIN: nightly
+    
+test-minimal-versions:
+  <<: *rust_test_template
+  variables:
+    RUSTUP_TOOLCHAIN: nightly
+  script:
+    - cargo test --all --verbose -Z minimal-versions
+    
+test-fmt:
+  <<: *rust_test_template
+  variables:
+    RUSTUP_TOOLCHAIN: nightly
+  script:
+    - cargo fmt --all --verbose -- --check
+    
+test-clippy:
+  <<: *rust_test_template
+  variables:
+    RUSTUP_TOOLCHAIN: nightly
+  script:
+    - cargo clippy --all --verbose -- -D warnings
+    
+test-prerelase:
+  stage: test
+  image: "buildpack-deps:stretch"
+  when: manual 
+  variables:
+    RUSTUP_DIST_SERVER: https://dev-static.rust-lang.org
+    CARGO_HOME: "$CI_PROJECT_DIR/cargo"
+  before_script:
+    - export PATH="$CARGO_HOME/bin:$PATH"
+    - curl https://sh.rustup.rs -sSf | sh -s -- -y  --default-toolchain stable
+    - rustup component add rustfmt-preview
+    - rustup --version
+    - rustc --version
+    - cargo --version
+  script:
+      - cargo test --all --verbose
+      - cargo fmt --all --verbose -- --write-mode=diff
