@@ -3,6 +3,11 @@ use serde_json::Value;
 
 use crate::model::*;
 
+pub trait Parser {
+    fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error>;
+    fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error>;
+}
+
 pub struct UdemyParser {}
 
 /// Parser for json data coming from udemy.
@@ -11,28 +16,8 @@ impl UdemyParser {
     pub fn new() -> UdemyParser {
         UdemyParser {}
     }
-
-    /// Parse subscribed courses for this user.
-    pub fn parse_subscribed_courses(
-        &self,
-        subscribed_courses: &Value,
-    ) -> Result<Vec<Course>, Error> {
-        let results = subscribed_courses
-            .get("results")
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .as_array()
-            .ok_or_else(|| format_err!("Error parsing json"))?;
-        let courses: Vec<Course> = results
-            .into_iter()
-            .map(|result| serde_json::from_value(result.clone()))
-            .filter(|course| course.is_ok())
-            .map(|course| course.unwrap())
-            .collect();
-        Ok(courses)
-    }
-
     /// Parse assets from the full course data.
-    pub fn parse_assets(&self, value: &Value) -> Result<Vec<Asset>, Error> {
+    fn parse_assets(&self, value: &Value) -> Result<Vec<Asset>, Error> {
         let assets = value
             .as_array()
             .ok_or_else(|| format_err!("Error parsing json"))?;
@@ -47,7 +32,7 @@ impl UdemyParser {
     }
 
     /// Parse json from a specific asset.
-    pub fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
+    fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
         let filename: String = asset
             .get("filename")
             .ok_or_else(|| format_err!("Error parsing json"))?
@@ -89,9 +74,27 @@ impl UdemyParser {
             download_urls,
         })
     }
+}
+
+impl Parser for UdemyParser {
+    /// Parse subscribed courses for this user.
+    fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error> {
+        let results = subscribed_courses
+            .get("results")
+            .ok_or_else(|| format_err!("Error parsing json"))?
+            .as_array()
+            .ok_or_else(|| format_err!("Error parsing json"))?;
+        let courses: Vec<Course> = results
+            .into_iter()
+            .map(|result| serde_json::from_value(result.clone()))
+            .filter(|course| course.is_ok())
+            .map(|course| course.unwrap())
+            .collect();
+        Ok(courses)
+    }
 
     /// Parse full course content.
-    pub fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error> {
+    fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error> {
         let results = full_course
             .get("results")
             .ok_or_else(|| format_err!("Error parsing json"))?
@@ -162,10 +165,10 @@ impl UdemyParser {
 
 #[cfg(test)]
 mod test_udemy_downloader {
-
-    use super::UdemyParser;
-    use crate::test_data::*;
     use serde_json::Value;
+
+    use super::*;
+    use crate::test_data::*;
 
     #[test]
     fn parse_subscribed_courses() {

@@ -1,82 +1,27 @@
 #![allow(dead_code)]
 
-use std::thread;
-use std::time::Duration;
+use std::fs::File;
+use std::io::prelude::*;
 
 use regex::Regex;
-
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, USER_AGENT};
-use reqwest::Client;
-
-use serde_json::Value;
 
 use clap::{App, AppSettings, Arg, SubCommand};
 
 use failure::{format_err, Error};
 
+mod http_client;
 mod model;
 mod parser;
 mod test_data;
+mod udemy_helper;
 
+use crate::http_client::*;
 use crate::model::*;
 use crate::parser::*;
-
-const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.21 (KHTML, like Gecko) Mwendo/1.1.5 Safari/537.21";
+use crate::udemy_helper::*;
 
 const PORTAL_NAME: &str = "www";
 const COURSE_SEARCH: &str = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}";
-
-struct UdemyHttpClient {
-    access_token: String,
-    client_id: String,
-    client: Client,
-}
-
-trait HttpClient {
-    fn get(&self, url: &str) -> Result<Value, Error>;
-}
-
-impl HttpClient for UdemyHttpClient {
-    fn get(&self, url: &str) -> Result<Value, Error> {
-        let mut resp = self
-            .client
-            .get(url)
-            .headers(self.construct_headers())
-            .send()?;
-        if resp.status().is_success() {
-            Ok(resp.json()?)
-        } else {
-            Err(format_err!("Error while getting from url <{}>", url))
-        }
-    }
-}
-
-impl UdemyHttpClient {
-    pub fn new(access_token: &str, client_id: &str) -> UdemyHttpClient {
-        let client = Client::new();
-
-        UdemyHttpClient {
-            client: client,
-            access_token: String::from(access_token),
-            client_id: String::from(client_id),
-        }
-    }
-
-    fn construct_headers(&self) -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        let bearer = format!("Bearer {}", self.access_token);
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(bearer.as_str()).unwrap(),
-        );
-        headers.insert(
-            HeaderName::from_lowercase(b"x-udemy-authorization").unwrap(),
-            HeaderValue::from_str(bearer.as_str()).unwrap(),
-        );
-        headers.insert(USER_AGENT, HeaderValue::from_str(DEFAULT_UA).unwrap());
-        headers
-    }
-}
 
 struct UdemyDownloader<'a> {
     course_name: String,
@@ -153,7 +98,7 @@ impl<'a> UdemyDownloader<'a> {
             portal_name = self.portal_name,
             course_name = self.course_name
         );
-        let value = self.client.get(url.as_str())?;
+        let value = self.client.get_as_json(url.as_str())?;
         let course = self
             .parser
             .parse_subscribed_courses(&value)?
@@ -166,9 +111,39 @@ impl<'a> UdemyDownloader<'a> {
         let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000",
         portal_name = self.portal_name, course_id=course.id);
 
-        let value = self.client.get(url.as_str())?;
+        let value = self.client.get_as_json(url.as_str())?;
         let course_content = self.parser.parse_course_content(&value)?;
         Ok(course_content)
+    }
+
+    fn download_url(&self, url: &str, target_filename: &str) -> Result<(), Error> {
+        if let Ok(content_length) = self.client.get_content_length(url) {
+            println!("Length: {}", content_length);
+
+            let buf = self.client.get_as_data(url)?;
+            let mut file = File::create(target_filename)?;
+            let size = file.write(&buf)?;
+            println!("{} bytes written", size);
+        }
+        Ok(())
+    }
+
+    fn download_lecture(&self, lecture: &Lecture, path: &str, dry_run: bool) -> Result<(), Error> {
+        let target_filename = UdemyHelper::calculate_target_filename(path, &lecture).unwrap();
+        if let Some(download_urls) = &lecture.asset.download_urls {
+            for url in download_urls {
+                if let Some(video_type) = &url.r#type {
+                    if url.label == "720" && video_type == "video/mp4" {
+                        println!("\tGetting {}", url.file);
+                        println!("\t\t-> {}", target_filename);
+                        if !dry_run {
+                            self.download_url(url.file.as_str(), target_filename.as_str())?
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn info(&self) -> Result<(), Error> {
@@ -177,14 +152,17 @@ impl<'a> UdemyDownloader<'a> {
         Ok(())
     }
 
+    /// Download files to a specified location. It is possible to specify
+    /// which chapter / lecture to download.
     pub fn download(
         &self,
         wanted_chapter: Option<u64>,
         wanted_lecture: Option<u64>,
+        output: &str,
         dry_run: bool,
     ) -> Result<(), Error> {
         println!(
-            "Downloadi request chapter: {:?}, lecture: {:?}, dry_run: {}",
+            "Download request chapter: {:?}, lecture: {:?}, dry_run: {}",
             wanted_chapter, wanted_lecture, dry_run
         );
         let course_content = self.extract()?;
@@ -198,27 +176,36 @@ impl<'a> UdemyDownloader<'a> {
                         "Downloading chapter {} - {}",
                         chapter.object_index, chapter.title
                     );
-
-                    chapter
-                        .lectures
-                        .into_iter()
-                        .filter(|lecture| lecture.asset.asset_type == "Video")
-                        .filter(|lecture| {
-                            wanted_lecture.is_none()
-                                || wanted_lecture.unwrap() == lecture.object_index
-                        })
-                        .for_each(move |lecture| {
-                            if let Some(download_urls) = lecture.asset.download_urls {
-                                for url in download_urls {
-                                    if url.label == "720" {
-                                        println!("\tGetting {}", url.file);
-                                        if !dry_run {
-                                            thread::sleep(Duration::from_millis(3000));
-                                        }
+                    let chapter_path = UdemyHelper::calculate_target_dir(
+                        output,
+                        &chapter,
+                        self.course_name.as_str(),
+                    )
+                    .unwrap();
+                    if let Ok(_) = UdemyHelper::create_target_dir(chapter_path.as_str()) {
+                        chapter
+                            .lectures
+                            .into_iter()
+                            .filter(|lecture| lecture.asset.asset_type == "Video")
+                            .filter(|lecture| {
+                                wanted_lecture.is_none()
+                                    || wanted_lecture.unwrap() == lecture.object_index
+                            })
+                            .for_each(move |lecture| {
+                                match self.download_lecture(
+                                    &lecture,
+                                    chapter_path.as_str(),
+                                    dry_run,
+                                ) {
+                                    Ok(()) => {
+                                        println!("Lecture downloaded");
                                     }
-                                }
-                            }
-                        });
+                                    Err(e) => {
+                                        println!("Error while saving {}: {}", lecture.title, e);
+                                    }
+                                };
+                            });
+                    }
                 }
             });
         Ok(())
@@ -290,6 +277,15 @@ fn main() {
                         .value_name("LECTURE")
                         .takes_value(true)
                         .help("Restrict download to a specific lecture"),
+                )
+                .arg(
+                    Arg::with_name("output")
+                        .short("o")
+                        .long("output")
+                        .value_name("OUTPUT_DIR")
+                        .takes_value(true)
+                        .default_value(".")
+                        .help("Directory where to output downloaded files (default to .)"),
                 ),
         )
         .get_matches();
@@ -318,9 +314,10 @@ fn main() {
                 .value_of("lecture")
                 .map(|v| v.parse::<u64>().ok().unwrap_or(0));
             let dry_run = sub_m.is_present("dry-run");
+            let output = sub_m.value_of("output").unwrap();
 
             // Ok(())
-            udemy_downloader.download(wanted_chapter, wanted_lecture, dry_run)
+            udemy_downloader.download(wanted_chapter, wanted_lecture, output, dry_run)
         }
         _ => Ok(()),
     };
@@ -336,13 +333,20 @@ mod test_udemy_downloader {
     use super::UdemyDownloader;
     use crate::HttpClient;
     use failure::Error;
+
     use serde_json::{json, Value};
 
     struct MockHttpClient {}
 
     impl HttpClient for MockHttpClient {
-        fn get(&self, _url: &str) -> Result<Value, Error> {
+        fn get_as_json(&self, _url: &str) -> Result<Value, Error> {
             Ok(json!({ "an": "object" }))
+        }
+        fn get_content_length(&self, _url: &str) -> Result<u64, Error> {
+            Ok(0)
+        }
+        fn get_as_data(&self, _url: &str) -> Result<Vec<u8>, Error> {
+            Ok(vec![])
         }
     }
 
