@@ -1,216 +1,19 @@
 #![allow(dead_code)]
 
-use std::fs::File;
-use std::io::prelude::*;
-
-use regex::Regex;
-
 use clap::{App, AppSettings, Arg, SubCommand};
 
-use failure::{format_err, Error};
+use failure::Error;
 
+mod downloader;
 mod http_client;
 mod model;
 mod parser;
 mod test_data;
 mod udemy_helper;
 
-use crate::http_client::*;
-use crate::model::*;
-use crate::parser::*;
-use crate::udemy_helper::*;
-
-const PORTAL_NAME: &str = "www";
-const COURSE_SEARCH: &str = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}";
-
-struct UdemyDownloader<'a> {
-    course_name: String,
-    portal_name: String,
-    parser: UdemyParser,
-    client: &'a HttpClient,
-}
-
-type CourseId = u64;
-
-impl<'a> UdemyDownloader<'a> {
-    pub fn new(url: &str, client: &'a HttpClient) -> Result<UdemyDownloader<'a>, Error> {
-        let re = Regex::new(
-            r"(?i)(?://(?P<portal_name>.+?).udemy.com/(?P<course_name>[a-zA-Z0-9_-]+))",
-        )?;
-        let captures = re
-            .captures(url)
-            .ok_or_else(|| format_err!("Could not parse provide url <{}>", url))?;
-        let course_name = String::from(
-            captures
-                .name("course_name")
-                .ok_or_else(|| format_err!("Could not compute course name out of url <{}>", url))?
-                .as_str(),
-        );
-        let portal_name = String::from(
-            captures
-                .name("portal_name")
-                .ok_or_else(|| format_err!("Could not compute portal name out of url <{}>", url))?
-                .as_str(),
-        );
-        Ok(UdemyDownloader {
-            course_name,
-            portal_name,
-            client,
-            parser: UdemyParser::new(),
-        })
-    }
-
-    fn print_course_content(&self, course_content: &CourseContent) -> () {
-        for chapter in course_content.chapters.iter() {
-            println!("{:03} Chapter {}", chapter.object_index, chapter.title);
-            for lecture in chapter.lectures.iter() {
-                println!("\t{:03} Lecture {}", lecture.object_index, lecture.title);
-                println!("\t\tFilename {}", lecture.asset.filename);
-                println!("\t\tAsset Type {}", lecture.asset.asset_type);
-                println!("\t\tTime estimation {}", lecture.asset.time_estimation);
-                if let Some(download_urls) = lecture.asset.download_urls.as_ref() {
-                    for url in download_urls.iter() {
-                        println!("\t\t\tUrl {}", url.file);
-                        println!("\t\t\tType {:?}", url.r#type);
-                        println!("\t\t\tLabel {}", url.label);
-                    }
-                }
-                for asset in lecture.supplementary_assets.iter() {
-                    println!("\t\tSuppl Filename {}", asset.filename);
-                    println!("\t\tSuppl Asset Type {}", asset.asset_type);
-                    println!("\t\tSuppl Time estimation {}", asset.time_estimation);
-                    if let Some(download_urls) = asset.download_urls.as_ref() {
-                        for url in download_urls.iter() {
-                            println!("\t\t\tUrl {}", url.file);
-                            println!("\t\t\tType {:?}", url.r#type);
-                            println!("\t\t\tLabel {}", url.label);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn extract(&self) -> Result<CourseContent, Error> {
-        println!("Requesting info");
-        let url = format!(
-            "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}",
-            portal_name = self.portal_name,
-            course_name = self.course_name
-        );
-        let value = self.client.get_as_json(url.as_str())?;
-        let course = self
-            .parser
-            .parse_subscribed_courses(&value)?
-            .into_iter()
-            .find(|course| course.published_title == self.course_name)
-            .ok_or_else(|| {
-                format_err!("{} was not found in subscribed courses", self.course_name)
-            })?;
-
-        let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000",
-        portal_name = self.portal_name, course_id=course.id);
-
-        let value = self.client.get_as_json(url.as_str())?;
-        let course_content = self.parser.parse_course_content(&value)?;
-        Ok(course_content)
-    }
-
-    fn download_url(&self, url: &str, target_filename: &str) -> Result<(), Error> {
-        if let Ok(content_length) = self.client.get_content_length(url) {
-            println!("Length: {}", content_length);
-
-            let buf = self.client.get_as_data(url)?;
-            let mut file = File::create(target_filename)?;
-            let size = file.write(&buf)?;
-            println!("{} bytes written", size);
-        }
-        Ok(())
-    }
-
-    fn download_lecture(&self, lecture: &Lecture, path: &str, dry_run: bool) -> Result<(), Error> {
-        let target_filename = UdemyHelper::calculate_target_filename(path, &lecture).unwrap();
-        if let Some(download_urls) = &lecture.asset.download_urls {
-            for url in download_urls {
-                if let Some(video_type) = &url.r#type {
-                    if url.label == "720" && video_type == "video/mp4" {
-                        println!("\tGetting {}", url.file);
-                        println!("\t\t-> {}", target_filename);
-                        if !dry_run {
-                            self.download_url(url.file.as_str(), target_filename.as_str())?
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub fn info(&self) -> Result<(), Error> {
-        let course_content = self.extract()?;
-        self.print_course_content(&course_content);
-        Ok(())
-    }
-
-    /// Download files to a specified location. It is possible to specify
-    /// which chapter / lecture to download.
-    pub fn download(
-        &self,
-        wanted_chapter: Option<u64>,
-        wanted_lecture: Option<u64>,
-        output: &str,
-        dry_run: bool,
-    ) -> Result<(), Error> {
-        println!(
-            "Download request chapter: {:?}, lecture: {:?}, dry_run: {}",
-            wanted_chapter, wanted_lecture, dry_run
-        );
-        let course_content = self.extract()?;
-
-        course_content
-            .chapters
-            .into_iter()
-            .for_each(move |chapter| {
-                if wanted_chapter.is_none() || wanted_chapter.unwrap() == chapter.object_index {
-                    println!(
-                        "Downloading chapter {} - {}",
-                        chapter.object_index, chapter.title
-                    );
-                    let chapter_path = UdemyHelper::calculate_target_dir(
-                        output,
-                        &chapter,
-                        self.course_name.as_str(),
-                    )
-                    .unwrap();
-                    if let Ok(_) = UdemyHelper::create_target_dir(chapter_path.as_str()) {
-                        chapter
-                            .lectures
-                            .into_iter()
-                            .filter(|lecture| lecture.asset.asset_type == "Video")
-                            .filter(|lecture| {
-                                wanted_lecture.is_none()
-                                    || wanted_lecture.unwrap() == lecture.object_index
-                            })
-                            .for_each(move |lecture| {
-                                match self.download_lecture(
-                                    &lecture,
-                                    chapter_path.as_str(),
-                                    dry_run,
-                                ) {
-                                    Ok(()) => {
-                                        println!("Lecture downloaded");
-                                    }
-                                    Err(e) => {
-                                        println!("Error while saving {}: {}", lecture.title, e);
-                                    }
-                                };
-                            });
-                    }
-                }
-            });
-        Ok(())
-    }
-}
+use downloader::UdemyDownloader;
+use http_client::UdemyHttpClient;
+use parser::UdemyParser;
 
 fn main() {
     let matches = App::new("Udemy Downloader")
@@ -295,7 +98,8 @@ fn main() {
     let client_id = matches.value_of("client_id").unwrap();
 
     let client = UdemyHttpClient::new(access_token, client_id);
-    let udemy_downloader = UdemyDownloader::new(url, &client).unwrap();
+    let parser = UdemyParser::new();
+    let udemy_downloader = UdemyDownloader::new(url, &client, &parser).unwrap();
 
     let result: Result<(), Error> = match matches.subcommand() {
         ("info", Some(_sub_m)) => {
@@ -316,7 +120,6 @@ fn main() {
             let dry_run = sub_m.is_present("dry-run");
             let output = sub_m.value_of("output").unwrap();
 
-            // Ok(())
             udemy_downloader.download(wanted_chapter, wanted_lecture, output, dry_run)
         }
         _ => Ok(()),
@@ -325,45 +128,4 @@ fn main() {
     if let Err(err) = result {
         eprintln!("An error Occured: {}", err);
     }
-}
-
-#[cfg(test)]
-mod test_udemy_downloader {
-
-    use super::UdemyDownloader;
-    use crate::HttpClient;
-    use failure::Error;
-
-    use serde_json::{json, Value};
-
-    struct MockHttpClient {}
-
-    impl HttpClient for MockHttpClient {
-        fn get_as_json(&self, _url: &str) -> Result<Value, Error> {
-            Ok(json!({ "an": "object" }))
-        }
-        fn get_content_length(&self, _url: &str) -> Result<u64, Error> {
-            Ok(0)
-        }
-        fn get_as_data(&self, _url: &str) -> Result<Vec<u8>, Error> {
-            Ok(vec![])
-        }
-    }
-
-    #[test]
-    fn parse_url() {
-        let mock_http_client = MockHttpClient {};
-        let dl = UdemyDownloader::new(
-            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
-            &mock_http_client,
-        )
-        .unwrap();
-
-        assert_eq!(
-            dl.course_name,
-            "css-the-complete-guide-incl-flexbox-grid-sass"
-        );
-        assert_eq!(dl.portal_name, "www");
-    }
-
 }
