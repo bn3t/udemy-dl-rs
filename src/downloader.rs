@@ -110,14 +110,14 @@ impl<'a> UdemyDownloader<'a> {
     }
 
     fn download_url(&self, url: &str, target_filename: &str) -> Result<(), Error> {
-        if let Ok(content_length) = self.client.get_content_length(url) {
-            println!("Length: {}", content_length);
+        let content_length = self.client.get_content_length(url)?;
 
-            let buf = self.client.get_as_data(url)?;
-            let mut file = File::create(target_filename)?;
-            let size = file.write(&buf)?;
-            println!("{} bytes written", size);
-        }
+        println!("Length: {}", content_length);
+
+        let buf = self.client.get_as_data(url)?;
+        let mut file = File::create(target_filename)?;
+        let size = file.write(&buf)?;
+        println!("{} bytes written", size);
         Ok(())
     }
 

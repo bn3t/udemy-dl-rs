@@ -28,7 +28,11 @@ impl HttpClient for UdemyHttpClient {
         if resp.status().is_success() {
             Ok(resp.json()?)
         } else {
-            Err(format_err!("Error while getting from url <{}>", url))
+            Err(format_err!(
+                "Error while getting from url <{}>, error: <{}>",
+                url,
+                resp.status()
+            ))
         }
     }
 
@@ -36,14 +40,18 @@ impl HttpClient for UdemyHttpClient {
         let resp = self
             .client
             .head(url)
-            .headers(self.construct_headers())
+            // .headers(self.construct_headers())
             .send()?;
         if resp.status().is_success() {
             Ok(resp
                 .content_length()
                 .ok_or_else(|| format_err!("Error getting length of url <{}>", url))?)
         } else {
-            Err(format_err!("Error while trying to access url <{}>", url))
+            Err(format_err!(
+                "Error while trying to access url <{}> - <{}>",
+                url,
+                resp.status()
+            ))
         }
     }
 
@@ -51,7 +59,7 @@ impl HttpClient for UdemyHttpClient {
         let mut resp = self
             .client
             .get(url)
-            .headers(self.construct_headers())
+            // .headers(self.construct_headers())
             .send()?;
         if resp.status().is_success() {
             let mut buf: Vec<u8> = vec![];
