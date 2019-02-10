@@ -30,7 +30,7 @@ docker:
     - cargo --version
   script:
     - cargo build
-    - cargo test --all
+    - cargo test --all -- --test-threads=1
 
 test-stable:
   <<: *rust_test_template
@@ -52,7 +52,7 @@ test-minimal-versions:
   variables:
     RUSTUP_TOOLCHAIN: nightly
   script:
-    - cargo test --all -Z minimal-versions
+    - cargo test --all -Z minimal-versions -- --test-threads=1
     
 test-fmt:
   <<: *rust_test_template
@@ -83,5 +83,5 @@ test-prerelase:
     - rustc --version
     - cargo --version
   script:
-      - cargo test --all
+      - cargo test --all -- --test-threads=1
       - cargo fmt --all -- --write-mode=diff

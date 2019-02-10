@@ -216,12 +216,15 @@ mod test_udemy_downloader {
     use crate::parser::Parser;
 
     static mut GETS_AS_JSON: Option<Vec<String>> = None;
+    static mut GETS_CONTENT_LENGTH: Option<Vec<String>> = None;
+    static mut GETS_AS_DATA: Option<Vec<String>> = None;
     static mut PARSE: Option<Vec<String>> = None;
 
     struct MockHttpClient {}
 
     impl HttpClient for MockHttpClient {
         fn get_as_json(&self, url: &str) -> Result<Value, Error> {
+            println!("get_as_json url={}", url);
             unsafe {
                 match GETS_AS_JSON {
                     Some(ref mut gaj) => {
@@ -232,10 +235,28 @@ mod test_udemy_downloader {
             };
             Ok(json!({ "url": url }))
         }
-        fn get_content_length(&self, _url: &str) -> Result<u64, Error> {
-            Ok(0)
+        fn get_content_length(&self, url: &str) -> Result<u64, Error> {
+            println!("get_content_length url={}", url);
+            unsafe {
+                match GETS_CONTENT_LENGTH {
+                    Some(ref mut gcl) => {
+                        gcl.push(String::from(url));
+                    }
+                    None => panic!(),
+                }
+            };
+            Ok(321)
         }
-        fn get_as_data(&self, _url: &str) -> Result<Vec<u8>, Error> {
+        fn get_as_data(&self, url: &str) -> Result<Vec<u8>, Error> {
+            println!("get_as_data url={}", url);
+            unsafe {
+                match GETS_AS_DATA {
+                    Some(ref mut gad) => {
+                        gad.push(String::from(url));
+                    }
+                    None => panic!(),
+                }
+            };
             Ok(vec![])
         }
     }
@@ -278,12 +299,38 @@ mod test_udemy_downloader {
                     }
                 };
             };
-            Ok(CourseContent { chapters: vec![] })
+            Ok(CourseContent {
+                chapters: vec![Chapter {
+                    object_index: 1,
+                    title: "The Chapter".into(),
+                    lectures: vec![Lecture {
+                        object_index: 1,
+                        title: "The Lecture".into(),
+                        asset: Asset {
+                            filename: "the-filename.mp4".into(),
+                            asset_type: "Video".into(),
+                            time_estimation: 321,
+                            download_urls: Some(vec![DownloadUrl {
+                                r#type: Some("video/mp4".into()),
+                                file: "http://host-name/the-filename.mp4".into(),
+                                label: "720".into(),
+                            }]),
+                        },
+                        supplementary_assets: vec![],
+                    }],
+                }],
+            })
         }
     }
 
     #[test]
     fn parse_url() {
+        unsafe {
+            PARSE = Some(vec![]);
+            GETS_AS_JSON = Some(vec![]);
+            GETS_CONTENT_LENGTH = Some(vec![]);
+            GETS_AS_DATA = Some(vec![]);
+        }
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let dl = UdemyDownloader::new(
@@ -305,7 +352,10 @@ mod test_udemy_downloader {
         unsafe {
             PARSE = Some(vec![]);
             GETS_AS_JSON = Some(vec![]);
+            GETS_CONTENT_LENGTH = Some(vec![]);
+            GETS_AS_DATA = Some(vec![]);
         }
+
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let dl = UdemyDownloader::new(
@@ -333,5 +383,50 @@ mod test_udemy_downloader {
         }
 
         //assert!(result.is_ok());
+    }
+
+    #[test]
+    fn download() {
+        unsafe {
+            PARSE = Some(vec![]);
+            GETS_AS_JSON = Some(vec![]);
+            GETS_CONTENT_LENGTH = Some(vec![]);
+            GETS_AS_DATA = Some(vec![]);
+        }
+
+        let mock_http_client = MockHttpClient {};
+        let mock_parser = MockParser::new();
+        let dl = UdemyDownloader::new(
+            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            &mock_http_client,
+            &mock_parser,
+        )
+        .unwrap();
+
+        let result = dl.download(Some(1), Some(1), "~/Downloads", false);
+
+        assert!(result.is_ok());
+
+        unsafe {
+            if let Some(ref gaj) = GETS_AS_JSON {
+                assert_eq!(gaj.len(), 2);
+                assert_eq!(gaj[0], "https://www.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search=css-the-complete-guide-incl-flexbox-grid-sass");
+                assert_eq!(gaj[1], "https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000");
+            }
+            if let Some(ref gcl) = GETS_CONTENT_LENGTH {
+                assert_eq!(gcl.len(), 1);
+                assert_eq!(gcl[0], "http://host-name/the-filename.mp4");
+            }
+            if let Some(ref gad) = GETS_AS_DATA {
+                assert_eq!(gad.len(), 1);
+                assert_eq!(gad[0], "http://host-name/the-filename.mp4");
+            }
+            if let Some(ref psc) = PARSE {
+                assert_eq!(psc.len(), 2);
+                assert_eq!(psc[0], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search=css-the-complete-guide-incl-flexbox-grid-sass\")})");
+                assert_eq!(psc[1], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000\")})");
+            }
+        }
+        // assert!(false);
     }
 }
