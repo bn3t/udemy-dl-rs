@@ -5,15 +5,19 @@ use clap::{App, AppSettings, Arg, SubCommand};
 use failure::Error;
 
 mod downloader;
+mod fs_helper;
 mod http_client;
 mod model;
 mod parser;
 mod test_data;
 mod udemy_helper;
+mod utils;
 
 use downloader::UdemyDownloader;
+use fs_helper::UdemyFsHelper;
 use http_client::UdemyHttpClient;
 use parser::UdemyParser;
+use udemy_helper::UdemyHelper;
 
 fn main() {
     let matches = App::new("Udemy Downloader")
@@ -97,9 +101,11 @@ fn main() {
     let access_token = matches.value_of("access_token").unwrap();
     let client_id = matches.value_of("client_id").unwrap();
 
+    let fs_helper = UdemyFsHelper {};
+    let udemy_helper = UdemyHelper::new(&fs_helper);
     let client = UdemyHttpClient::new(access_token, client_id);
     let parser = UdemyParser::new();
-    let udemy_downloader = UdemyDownloader::new(url, &client, &parser).unwrap();
+    let udemy_downloader = UdemyDownloader::new(url, &client, &parser, &udemy_helper).unwrap();
 
     let result: Result<(), Error> = match matches.subcommand() {
         ("info", Some(_sub_m)) => {

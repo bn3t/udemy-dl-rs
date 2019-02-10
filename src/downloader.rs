@@ -17,6 +17,7 @@ pub struct UdemyDownloader<'a> {
     portal_name: String,
     parser: &'a Parser,
     client: &'a HttpClient,
+    udemy_helper: &'a UdemyHelper<'a>,
 }
 
 type CourseId = u64;
@@ -26,6 +27,7 @@ impl<'a> UdemyDownloader<'a> {
         url: &str,
         client: &'a HttpClient,
         parser: &'a Parser,
+        udemy_helper: &'a UdemyHelper,
     ) -> Result<UdemyDownloader<'a>, Error> {
         let re = Regex::new(
             r"(?i)(?://(?P<portal_name>.+?).udemy.com/(?P<course_name>[a-zA-Z0-9_-]+))",
@@ -50,6 +52,7 @@ impl<'a> UdemyDownloader<'a> {
             portal_name,
             client,
             parser,
+            udemy_helper,
         })
     }
 
@@ -122,7 +125,10 @@ impl<'a> UdemyDownloader<'a> {
     }
 
     fn download_lecture(&self, lecture: &Lecture, path: &str, dry_run: bool) -> Result<(), Error> {
-        let target_filename = UdemyHelper::calculate_target_filename(path, &lecture).unwrap();
+        let target_filename = self
+            .udemy_helper
+            .calculate_target_filename(path, &lecture)
+            .unwrap();
         if let Some(download_urls) = &lecture.asset.download_urls {
             for url in download_urls {
                 if let Some(video_type) = &url.r#type {
@@ -169,13 +175,15 @@ impl<'a> UdemyDownloader<'a> {
                         "Downloading chapter {} - {}",
                         chapter.object_index, chapter.title
                     );
-                    let chapter_path = UdemyHelper::calculate_target_dir(
-                        output,
-                        &chapter,
-                        self.course_name.as_str(),
-                    )
-                    .unwrap();
-                    if UdemyHelper::create_target_dir(chapter_path.as_str()).is_ok() {
+                    let chapter_path = self
+                        .udemy_helper
+                        .calculate_target_dir(output, &chapter, self.course_name.as_str())
+                        .unwrap();
+                    if self
+                        .udemy_helper
+                        .create_target_dir(chapter_path.as_str())
+                        .is_ok()
+                    {
                         chapter
                             .lectures
                             .into_iter()
@@ -211,9 +219,11 @@ mod test_udemy_downloader {
     use serde_json::{json, Value};
 
     use super::UdemyDownloader;
+    use crate::fs_helper::FsHelper;
     use crate::http_client::HttpClient;
     use crate::model::*;
     use crate::parser::Parser;
+    use crate::udemy_helper::UdemyHelper;
 
     static mut GETS_AS_JSON: Option<Vec<String>> = None;
     static mut GETS_CONTENT_LENGTH: Option<Vec<String>> = None;
@@ -323,6 +333,14 @@ mod test_udemy_downloader {
         }
     }
 
+    struct MockFsHelper {}
+
+    impl FsHelper for MockFsHelper {
+        fn create_dir_recursive(&self, _path: &str) -> Result<(), Error> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn parse_url() {
         unsafe {
@@ -331,12 +349,17 @@ mod test_udemy_downloader {
             GETS_CONTENT_LENGTH = Some(vec![]);
             GETS_AS_DATA = Some(vec![]);
         }
+
+        let fs_helper = MockFsHelper {};
+
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
+            &udemy_helper,
         )
         .unwrap();
 
@@ -356,12 +379,16 @@ mod test_udemy_downloader {
             GETS_AS_DATA = Some(vec![]);
         }
 
+        let fs_helper = MockFsHelper {};
+
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
+            &udemy_helper,
         )
         .unwrap();
 
@@ -381,8 +408,6 @@ mod test_udemy_downloader {
                 assert_eq!(psc[1], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000\")})");
             }
         }
-
-        //assert!(result.is_ok());
     }
 
     #[test]
@@ -394,12 +419,16 @@ mod test_udemy_downloader {
             GETS_AS_DATA = Some(vec![]);
         }
 
+        let fs_helper = MockFsHelper {};
+
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
+            &udemy_helper,
         )
         .unwrap();
 
