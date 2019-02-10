@@ -29,7 +29,8 @@ docker:
     - rustc --version
     - cargo --version
   script:
-    - cargo test --all --verbose
+    - cargo build
+    - cargo test --all
 
 test-stable:
   <<: *rust_test_template
@@ -51,21 +52,21 @@ test-minimal-versions:
   variables:
     RUSTUP_TOOLCHAIN: nightly
   script:
-    - cargo test --all --verbose -Z minimal-versions
+    - cargo test --all -Z minimal-versions
     
 test-fmt:
   <<: *rust_test_template
   variables:
     RUSTUP_TOOLCHAIN: nightly
   script:
-    - cargo fmt --all --verbose -- --check
+    - cargo fmt --all -- --check
     
 test-clippy:
   <<: *rust_test_template
   variables:
     RUSTUP_TOOLCHAIN: nightly
   script:
-    - cargo clippy --all --verbose -- -D warnings
+    - cargo clippy --all -- -D warnings
     
 test-prerelase:
   stage: test
@@ -82,5 +83,5 @@ test-prerelase:
     - rustc --version
     - cargo --version
   script:
-      - cargo test --all --verbose
-      - cargo fmt --all --verbose -- --write-mode=diff
+      - cargo test --all
+      - cargo fmt --all -- --write-mode=diff

@@ -53,7 +53,7 @@ impl<'a> UdemyDownloader<'a> {
         })
     }
 
-    fn print_course_content(&self, course_content: &CourseContent) -> () {
+    fn print_course_content(&self, course_content: &CourseContent) {
         for chapter in course_content.chapters.iter() {
             println!("{:03} Chapter {}", chapter.object_index, chapter.title);
             for lecture in chapter.lectures.iter() {
