@@ -175,7 +175,7 @@ impl<'a> UdemyDownloader<'a> {
                         self.course_name.as_str(),
                     )
                     .unwrap();
-                    if let Ok(_) = UdemyHelper::create_target_dir(chapter_path.as_str()) {
+                    if UdemyHelper::create_target_dir(chapter_path.as_str()).is_ok() {
                         chapter
                             .lectures
                             .into_iter()

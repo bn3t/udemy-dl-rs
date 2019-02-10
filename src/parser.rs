@@ -23,7 +23,7 @@ impl UdemyParser {
             .ok_or_else(|| format_err!("Error parsing json"))?;
 
         let assets: Vec<Asset> = assets
-            .into_iter()
+            .iter()
             .map(|asset| self.parse_asset(asset))
             .filter(|asset| asset.is_ok())
             .map(|asset| asset.unwrap())
@@ -85,7 +85,7 @@ impl Parser for UdemyParser {
             .as_array()
             .ok_or_else(|| format_err!("Error parsing json"))?;
         let courses: Vec<Course> = results
-            .into_iter()
+            .iter()
             .map(|result| serde_json::from_value(result.clone()))
             .filter(|course| course.is_ok())
             .map(|course| course.unwrap())
@@ -105,7 +105,7 @@ impl Parser for UdemyParser {
         let mut lectures: Vec<Lecture> = Vec::new();
         let mut current_chapter: Option<Chapter> = None;
 
-        for item in results.into_iter() {
+        for item in results.iter() {
             if item.get("_class").unwrap() == "chapter" {
                 if current_chapter.is_some() {
                     let mut this_chapter = current_chapter.unwrap();
