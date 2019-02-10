@@ -159,7 +159,7 @@ impl Parser for UdemyParser {
             this_chapter.lectures.append(&mut lectures);
             chapters.push(this_chapter);
         }
-        Ok(CourseContent { chapters: chapters })
+        Ok(CourseContent { chapters })
     }
 }
 

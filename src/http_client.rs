@@ -68,7 +68,7 @@ impl UdemyHttpClient {
         let client = Client::new();
 
         UdemyHttpClient {
-            client: client,
+            client,
             access_token: String::from(access_token),
             client_id: String::from(client_id),
         }
