@@ -117,7 +117,9 @@ impl<'a> UdemyDownloader<'a> {
 
         println!("Length: {}", content_length);
 
-        let buf = self.client.get_as_data(url)?;
+        let buf = self.client.get_as_data(url, &mut |size| {
+            println!("Feedback size={}", size);
+        })?;
         let mut file = File::create(target_filename)?;
         let size = file.write(&buf)?;
         println!("{} bytes written", size);
@@ -257,7 +259,7 @@ mod test_udemy_downloader {
             };
             Ok(321)
         }
-        fn get_as_data(&self, url: &str) -> Result<Vec<u8>, Error> {
+        fn get_as_data(&self, url: &str, _f: &mut FnMut(u64)) -> Result<Vec<u8>, Error> {
             println!("get_as_data url={}", url);
             unsafe {
                 match GETS_AS_DATA {

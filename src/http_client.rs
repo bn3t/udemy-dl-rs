@@ -14,7 +14,7 @@ pub struct UdemyHttpClient {
 
 pub trait HttpClient {
     fn get_as_json(&self, url: &str) -> Result<Value, Error>;
-    fn get_as_data(&self, url: &str) -> Result<Vec<u8>, Error>;
+    fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
 }
 
@@ -55,7 +55,7 @@ impl HttpClient for UdemyHttpClient {
         }
     }
 
-    fn get_as_data(&self, url: &str) -> Result<Vec<u8>, Error> {
+    fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error> {
         let mut resp = self
             .client
             .get(url)
@@ -63,7 +63,8 @@ impl HttpClient for UdemyHttpClient {
             .send()?;
         if resp.status().is_success() {
             let mut buf: Vec<u8> = vec![];
-            resp.copy_to(&mut buf)?;
+            let size = resp.copy_to(&mut buf)?;
+            (*f)(size);
             Ok(buf)
         } else {
             Err(format_err!("Error while getting from url <{}>", url))
