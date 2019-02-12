@@ -235,6 +235,10 @@ mod test_udemy_downloader {
     struct MockHttpClient {}
 
     impl HttpClient for MockHttpClient {
+        // fn has_http_range(&self, url: &str) -> Result<bool, Error> {
+        //     Ok(true)
+        // }
+
         fn get_as_json(&self, url: &str) -> Result<Value, Error> {
             println!("get_as_json url={}", url);
             unsafe {
