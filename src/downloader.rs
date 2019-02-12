@@ -216,7 +216,9 @@ impl<'a> UdemyDownloader<'a> {
 #[cfg(test)]
 mod test_udemy_downloader {
     use failure::Error;
+    use lazy_static::lazy_static;
     use serde_json::{json, Value};
+    use std::sync::Barrier;
 
     use super::UdemyDownloader;
     use crate::fs_helper::FsHelper;
@@ -229,6 +231,9 @@ mod test_udemy_downloader {
     static mut GETS_CONTENT_LENGTH: Option<Vec<String>> = None;
     static mut GETS_AS_DATA: Option<Vec<String>> = None;
     static mut PARSE: Option<Vec<String>> = None;
+    lazy_static! {
+        static ref BARRIER: Barrier = Barrier::new(1);
+    }
 
     struct MockHttpClient {}
 
@@ -343,6 +348,9 @@ mod test_udemy_downloader {
 
     #[test]
     fn parse_url() {
+        println!("before");
+        let _b = BARRIER.wait();
+        println!("******after");
         unsafe {
             PARSE = Some(vec![]);
             GETS_AS_JSON = Some(vec![]);
@@ -368,10 +376,14 @@ mod test_udemy_downloader {
             "css-the-complete-guide-incl-flexbox-grid-sass"
         );
         assert_eq!(dl.portal_name, "www");
+        println!("******end");
     }
 
     #[test]
     fn info() {
+        println!("before");
+        let _b = BARRIER.wait();
+        println!("******after");
         unsafe {
             PARSE = Some(vec![]);
             GETS_AS_JSON = Some(vec![]);
@@ -408,10 +420,14 @@ mod test_udemy_downloader {
                 assert_eq!(psc[1], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000\")})");
             }
         }
+        println!("******end");
     }
 
     #[test]
     fn download() {
+        println!("before");
+        let _b = BARRIER.wait();
+        println!("*******after");
         unsafe {
             PARSE = Some(vec![]);
             GETS_AS_JSON = Some(vec![]);
@@ -457,5 +473,6 @@ mod test_udemy_downloader {
             }
         }
         // assert!(false);
+        println!("******end");
     }
 }

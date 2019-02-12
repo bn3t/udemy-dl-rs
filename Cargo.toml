@@ -12,6 +12,7 @@ regex = "1.1.0"
 serde = "1.0.86"
 serde_derive = "1.0.86"
 serde_json = "1.0.38"
+lazy_static = "1.2.0"
 
 # [build-dependencies]
 # chrono = "0.4.0"
