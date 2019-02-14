@@ -3,11 +3,15 @@ use std::io::prelude::*;
 
 use failure::{format_err, Error};
 use regex::Regex;
+use std::time::Instant;
+
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::http_client::HttpClient;
 use crate::model::*;
 use crate::parser::*;
 use crate::udemy_helper::*;
+use crate::utils::*;
 
 const PORTAL_NAME: &str = "www";
 const COURSE_SEARCH: &str = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}";
@@ -112,21 +116,46 @@ impl<'a> UdemyDownloader<'a> {
         Ok(course_content)
     }
 
-    fn download_url(&self, url: &str, target_filename: &str) -> Result<(), Error> {
+    fn download_url(
+        &self,
+        lecture_title: &str,
+        url: &str,
+        target_filename: &str,
+    ) -> Result<(), Error> {
         let content_length = self.client.get_content_length(url)?;
+        let start = Instant::now();
 
-        println!("Length: {}", content_length);
-
+        let pb = ProgressBar::new(content_length);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) ({msg})")
+                .progress_chars("#>-"),
+        );
+        pb.set_message(lecture_title);
         let buf = self.client.get_as_data(url, &mut |size| {
-            println!("Feedback size={}", size);
+            pb.set_position(size);
         })?;
         let mut file = File::create(target_filename)?;
-        let size = file.write(&buf)?;
-        println!("{} bytes written", size);
+        let _size = file.write(&buf)?;
+        let elapsed = Instant::now().duration_since(start);
+        let elapsed = elapsed.as_secs() * 1000u64 + elapsed.subsec_millis() as u64;
+        pb.finish_with_message(
+            format!(
+                "{:1.2} MB/s",
+                calculate_download_speed(content_length, elapsed)
+            )
+            .as_str(),
+        );
         Ok(())
     }
 
-    fn download_lecture(&self, lecture: &Lecture, path: &str, dry_run: bool) -> Result<(), Error> {
+    fn download_lecture(
+        &self,
+        lecture: &Lecture,
+        path: &str,
+        dry_run: bool,
+        verbose: bool,
+    ) -> Result<(), Error> {
         let target_filename = self
             .udemy_helper
             .calculate_target_filename(path, &lecture)
@@ -135,10 +164,16 @@ impl<'a> UdemyDownloader<'a> {
             for url in download_urls {
                 if let Some(video_type) = &url.r#type {
                     if url.label == "720" && video_type == "video/mp4" {
-                        println!("\tGetting {}", url.file);
-                        println!("\t\t-> {}", target_filename);
+                        if verbose {
+                            println!("\tGetting {}", url.file);
+                            println!("\t\t-> {}", target_filename);
+                        }
                         if !dry_run {
-                            self.download_url(url.file.as_str(), target_filename.as_str())?
+                            self.download_url(
+                                lecture.title.as_str(),
+                                url.file.as_str(),
+                                target_filename.as_str(),
+                            )?
                         }
                     }
                 }
@@ -161,6 +196,7 @@ impl<'a> UdemyDownloader<'a> {
         wanted_lecture: Option<u64>,
         output: &str,
         dry_run: bool,
+        verbose: bool,
     ) -> Result<(), Error> {
         println!(
             "Download request chapter: {:?}, lecture: {:?}, dry_run: {}",
@@ -173,10 +209,12 @@ impl<'a> UdemyDownloader<'a> {
             .into_iter()
             .for_each(move |chapter| {
                 if wanted_chapter.is_none() || wanted_chapter.unwrap() == chapter.object_index {
-                    println!(
-                        "Downloading chapter {} - {}",
-                        chapter.object_index, chapter.title
-                    );
+                    if verbose {
+                        println!(
+                            "Downloading chapter {} - {}",
+                            chapter.object_index, chapter.title
+                        );
+                    }
                     let chapter_path = self
                         .udemy_helper
                         .calculate_target_dir(output, &chapter, self.course_name.as_str())
@@ -199,12 +237,15 @@ impl<'a> UdemyDownloader<'a> {
                                     &lecture,
                                     chapter_path.as_str(),
                                     dry_run,
+                                    verbose,
                                 ) {
                                     Ok(()) => {
-                                        println!("Lecture downloaded");
+                                        if verbose {
+                                            println!("Lecture downloaded");
+                                        }
                                     }
                                     Err(e) => {
-                                        println!("Error while saving {}: {}", lecture.title, e);
+                                        eprintln!("Error while saving {}: {}", lecture.title, e);
                                     }
                                 };
                             });
@@ -438,7 +479,7 @@ mod test_udemy_downloader {
         )
         .unwrap();
 
-        let result = dl.download(Some(1), Some(1), "~/Downloads", false);
+        let result = dl.download(Some(1), Some(1), "~/Downloads", false, false);
 
         assert!(result.is_ok());
 

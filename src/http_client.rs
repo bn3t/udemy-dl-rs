@@ -7,7 +7,7 @@ use reqwest::StatusCode;
 use serde_json::Value;
 
 const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.21 (KHTML, like Gecko) Mwendo/1.1.5 Safari/537.21";
-const CHUNK: u64 = 1024 * 1024;
+const CHUNK: u64 = 2 * 1024 * 1024;
 
 pub struct UdemyHttpClient {
     access_token: String,
@@ -16,7 +16,6 @@ pub struct UdemyHttpClient {
 }
 
 pub trait HttpClient {
-    // fn has_http_range(&self, url: &str) -> Result<bool, Error>;
     fn get_as_json(&self, url: &str) -> Result<Value, Error>;
     fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
