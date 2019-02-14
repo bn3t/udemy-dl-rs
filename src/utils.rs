@@ -28,6 +28,10 @@ pub fn sanitize(component: &str) -> String {
     buf
 }
 
+pub fn calculate_download_speed(total: u64, elapsed: u64) -> f64 {
+    (total * 1000u64 / elapsed) as f64 / 1024.0 / 1024.0
+}
+
 #[cfg(test)]
 mod test_udemy_helper {
     use super::*;
@@ -48,5 +52,12 @@ mod test_udemy_helper {
             actual,
             "087 Styling _ Positioning our Badge with _absolute_ and _relative_.mp4"
         );
+    }
+
+    #[test]
+    fn test_calculate_download_speed() {
+        let actual = calculate_download_speed(1024u64 * 1024u64, 1000);
+
+        assert_eq!(actual, 1.0);
     }
 }

@@ -97,6 +97,7 @@ fn main() {
         )
         .get_matches();
 
+    let verbose = matches.is_present("verbose");
     let url = matches.value_of("url").unwrap();
     let access_token = matches.value_of("access_token").unwrap();
     let client_id = matches.value_of("client_id").unwrap();
@@ -126,7 +127,7 @@ fn main() {
             let dry_run = sub_m.is_present("dry-run");
             let output = sub_m.value_of("output").unwrap();
 
-            udemy_downloader.download(wanted_chapter, wanted_lecture, output, dry_run)
+            udemy_downloader.download(wanted_chapter, wanted_lecture, output, dry_run, verbose)
         }
         _ => Ok(()),
     };
