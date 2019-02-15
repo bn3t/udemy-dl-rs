@@ -91,8 +91,10 @@ impl<'a> UdemyDownloader<'a> {
         }
     }
 
-    fn extract(&self) -> Result<CourseContent, Error> {
-        println!("Requesting info");
+    fn extract(&self, verbose: bool) -> Result<CourseContent, Error> {
+        if verbose {
+            println!("Requesting info");
+        }
         let url = format!(
             "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}",
             portal_name = self.portal_name,
@@ -149,6 +151,18 @@ impl<'a> UdemyDownloader<'a> {
         Ok(())
     }
 
+    fn determine_best_quality(&self, download_urls: &[DownloadUrl]) -> Result<String, Error> {
+        let best = download_urls
+            .iter()
+            .filter(|url| url.r#type == Some("video/mp4".into()))
+            .map(|url| &url.label)
+            .filter_map(|label| label.parse::<u32>().ok())
+            .max()
+            .map(|q| q.to_string())
+            .ok_or_else(|| format_err!("No best quality could be found"))?;
+        Ok(best)
+    }
+
     fn download_lecture(
         &self,
         lecture: &Lecture,
@@ -161,11 +175,12 @@ impl<'a> UdemyDownloader<'a> {
             .calculate_target_filename(path, &lecture)
             .unwrap();
         if let Some(download_urls) = &lecture.asset.download_urls {
+            let best_quality = self.determine_best_quality(&download_urls)?;
             for url in download_urls {
                 if let Some(video_type) = &url.r#type {
-                    if url.label == "720" && video_type == "video/mp4" {
+                    if url.label == best_quality && video_type == "video/mp4" {
                         if verbose {
-                            println!("\tGetting {}", url.file);
+                            println!("\tGetting ({}) {}", url.label, url.file);
                             println!("\t\t-> {}", target_filename);
                         }
                         if !dry_run {
@@ -182,8 +197,8 @@ impl<'a> UdemyDownloader<'a> {
         Ok(())
     }
 
-    pub fn info(&self) -> Result<(), Error> {
-        let course_content = self.extract()?;
+    pub fn info(&self, verbose: bool) -> Result<(), Error> {
+        let course_content = self.extract(verbose)?;
         self.print_course_content(&course_content);
         Ok(())
     }
@@ -198,11 +213,13 @@ impl<'a> UdemyDownloader<'a> {
         dry_run: bool,
         verbose: bool,
     ) -> Result<(), Error> {
-        println!(
-            "Download request chapter: {:?}, lecture: {:?}, dry_run: {}",
-            wanted_chapter, wanted_lecture, dry_run
-        );
-        let course_content = self.extract()?;
+        if verbose {
+            println!(
+                "Download request chapter: {:?}, lecture: {:?}, dry_run: {}",
+                wanted_chapter, wanted_lecture, dry_run
+            );
+        }
+        let course_content = self.extract(verbose)?;
 
         course_content
             .chapters
@@ -239,10 +256,10 @@ impl<'a> UdemyDownloader<'a> {
                                     dry_run,
                                     verbose,
                                 ) {
-                                    Ok(()) => {
-                                        if verbose {
-                                            println!("Lecture downloaded");
-                                        }
+                                    Ok(_) => {
+                                        // if verbose {
+                                        //     println!("Lecture downloaded");
+                                        // }
                                     }
                                     Err(e) => {
                                         eprintln!("Error while saving {}: {}", lecture.title, e);
@@ -439,7 +456,7 @@ mod test_udemy_downloader {
         )
         .unwrap();
 
-        let result = dl.info();
+        let result = dl.info(true);
 
         assert!(result.is_ok());
 
@@ -503,6 +520,44 @@ mod test_udemy_downloader {
                 assert_eq!(psc[1], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000\")})");
             }
         }
-        // assert!(false);
+    }
+
+    #[test]
+    fn determine_best_quality() {
+        let fs_helper = MockFsHelper {};
+
+        let mock_http_client = MockHttpClient {};
+        let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
+        let dl = UdemyDownloader::new(
+            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            &mock_http_client,
+            &mock_parser,
+            &udemy_helper,
+        )
+        .unwrap();
+
+        let download_urls = vec![
+            DownloadUrl {
+                label: "480".into(),
+                file: "the-file-video-480".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "720".into(),
+                file: "the-file-video-720".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "1720".into(),
+                file: "the-file-720".into(),
+                r#type: Some("other/mp4".into()),
+            },
+        ];
+
+        let actual = dl.determine_best_quality(&download_urls);
+
+        assert_eq!(actual.is_ok(), true);
+        assert_eq!(actual.unwrap(), "720");
     }
 }

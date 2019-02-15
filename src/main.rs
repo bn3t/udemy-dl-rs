@@ -53,7 +53,7 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("v")
+            Arg::with_name("verbose")
                 .short("v")
                 .multiple(true)
                 .help("Sets the level of verbosity"),
@@ -114,10 +114,10 @@ fn main() {
                 "Request information from {}",
                 matches.value_of("url").unwrap()
             );
-            udemy_downloader.info().map(|_r| ())
+            udemy_downloader.info(verbose).map(|_r| ())
         }
         ("download", Some(sub_m)) => {
-            println!("Downloading from {}", matches.value_of("url").unwrap());
+            // println!("Downloading from {}", matches.value_of("url").unwrap());
             let wanted_chapter = sub_m
                 .value_of("chapter")
                 .map(|v| v.parse::<u64>().ok().unwrap_or(0));
