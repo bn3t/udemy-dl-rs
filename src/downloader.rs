@@ -140,7 +140,7 @@ impl<'a> UdemyDownloader<'a> {
         let mut file = File::create(target_filename)?;
         let _size = file.write(&buf)?;
         let elapsed = Instant::now().duration_since(start);
-        let elapsed = elapsed.as_secs() * 1000u64 + elapsed.subsec_millis() as u64;
+        let elapsed = elapsed.as_secs() * 1000u64 + u64::from(elapsed.subsec_millis());
         pb.finish_with_message(
             format!(
                 "{:1.2} MB/s",
