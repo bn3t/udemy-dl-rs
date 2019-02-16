@@ -151,21 +151,36 @@ impl<'a> UdemyDownloader<'a> {
         Ok(())
     }
 
-    fn determine_best_quality(&self, download_urls: &[DownloadUrl]) -> Result<String, Error> {
-        let best = download_urls
-            .iter()
-            .filter(|url| url.r#type == Some("video/mp4".into()))
-            .map(|url| &url.label)
-            .filter_map(|label| label.parse::<u32>().ok())
-            .max()
+    fn determine_quality(
+        &self,
+        download_urls: &[DownloadUrl],
+        wanted_quality: Option<u64>,
+    ) -> Result<String, Error> {
+        let quality = match wanted_quality {
+            Some(quality) => download_urls
+                .iter()
+                .filter(|url| url.r#type == Some("video/mp4".into()))
+                .map(|url| &url.label)
+                .filter_map(|label| label.parse::<u64>().ok())
+                .filter(|label| *label >= quality)
+                .min(),
+            None => download_urls
+                .iter()
+                .filter(|url| url.r#type == Some("video/mp4".into()))
+                .map(|url| &url.label)
+                .filter_map(|label| label.parse::<u64>().ok())
+                .max(),
+        };
+        let quality = quality
             .map(|q| q.to_string())
             .ok_or_else(|| format_err!("No best quality could be found"))?;
-        Ok(best)
+        Ok(quality)
     }
 
     fn download_lecture(
         &self,
         lecture: &Lecture,
+        wanted_quality: Option<u64>,
         path: &str,
         dry_run: bool,
         verbose: bool,
@@ -175,7 +190,7 @@ impl<'a> UdemyDownloader<'a> {
             .calculate_target_filename(path, &lecture)
             .unwrap();
         if let Some(download_urls) = &lecture.asset.download_urls {
-            let best_quality = self.determine_best_quality(&download_urls)?;
+            let best_quality = self.determine_quality(&download_urls, wanted_quality)?;
             for url in download_urls {
                 if let Some(video_type) = &url.r#type {
                     if url.label == best_quality && video_type == "video/mp4" {
@@ -209,14 +224,15 @@ impl<'a> UdemyDownloader<'a> {
         &self,
         wanted_chapter: Option<u64>,
         wanted_lecture: Option<u64>,
+        wanted_quality: Option<u64>,
         output: &str,
         dry_run: bool,
         verbose: bool,
     ) -> Result<(), Error> {
         if verbose {
             println!(
-                "Download request chapter: {:?}, lecture: {:?}, dry_run: {}",
-                wanted_chapter, wanted_lecture, dry_run
+                "Download request chapter: {:?}, lecture: {:?}, quality: {:?}, dry_run: {}",
+                wanted_chapter, wanted_lecture, wanted_quality, dry_run
             );
         }
         let course_content = self.extract(verbose)?;
@@ -252,6 +268,7 @@ impl<'a> UdemyDownloader<'a> {
                             .for_each(move |lecture| {
                                 match self.download_lecture(
                                     &lecture,
+                                    wanted_quality,
                                     chapter_path.as_str(),
                                     dry_run,
                                     verbose,
@@ -496,7 +513,7 @@ mod test_udemy_downloader {
         )
         .unwrap();
 
-        let result = dl.download(Some(1), Some(1), "~/Downloads", false, false);
+        let result = dl.download(Some(1), Some(1), None, "~/Downloads", false, false);
 
         assert!(result.is_ok());
 
@@ -523,7 +540,7 @@ mod test_udemy_downloader {
     }
 
     #[test]
-    fn determine_best_quality() {
+    fn determine_quality_for_best() {
         let fs_helper = MockFsHelper {};
 
         let mock_http_client = MockHttpClient {};
@@ -554,10 +571,101 @@ mod test_udemy_downloader {
                 r#type: Some("other/mp4".into()),
             },
         ];
+        let wanted_quality = None;
 
-        let actual = dl.determine_best_quality(&download_urls);
+        let actual = dl.determine_quality(&download_urls, wanted_quality);
 
         assert_eq!(actual.is_ok(), true);
         assert_eq!(actual.unwrap(), "720");
+    }
+
+    #[test]
+    fn determine_quality_for_wanted_480() {
+        let fs_helper = MockFsHelper {};
+
+        let mock_http_client = MockHttpClient {};
+        let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
+        let dl = UdemyDownloader::new(
+            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            &mock_http_client,
+            &mock_parser,
+            &udemy_helper,
+        )
+        .unwrap();
+
+        let download_urls = vec![
+            DownloadUrl {
+                label: "480".into(),
+                file: "the-file-video-480".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "360".into(),
+                file: "the-file-video-360".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "720".into(),
+                file: "the-file-video-720".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "1720".into(),
+                file: "the-file-720".into(),
+                r#type: Some("other/mp4".into()),
+            },
+        ];
+        let wanted_quality = Some(480u64);
+
+        let actual = dl.determine_quality(&download_urls, wanted_quality);
+
+        assert_eq!(actual.is_ok(), true);
+        assert_eq!(actual.unwrap(), "480");
+    }
+
+    #[test]
+    fn determine_quality_for_wanted_470() {
+        let fs_helper = MockFsHelper {};
+
+        let mock_http_client = MockHttpClient {};
+        let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
+        let dl = UdemyDownloader::new(
+            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            &mock_http_client,
+            &mock_parser,
+            &udemy_helper,
+        )
+        .unwrap();
+
+        let download_urls = vec![
+            DownloadUrl {
+                label: "480".into(),
+                file: "the-file-video-480".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "360".into(),
+                file: "the-file-video-360".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "720".into(),
+                file: "the-file-video-720".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "1720".into(),
+                file: "the-file-720".into(),
+                r#type: Some("other/mp4".into()),
+            },
+        ];
+        let wanted_quality = Some(470u64);
+
+        let actual = dl.determine_quality(&download_urls, wanted_quality);
+
+        assert_eq!(actual.is_ok(), true);
+        assert_eq!(actual.unwrap(), "480");
     }
 }

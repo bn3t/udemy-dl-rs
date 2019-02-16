@@ -86,6 +86,14 @@ fn main() {
                         .help("Restrict download to a specific lecture"),
                 )
                 .arg(
+                    Arg::with_name("quality")
+                        .short("q")
+                        .long("quality")
+                        .value_name("QUALITY")
+                        .takes_value(true)
+                        .help("Download specific video quality."),
+                )
+                .arg(
                     Arg::with_name("output")
                         .short("o")
                         .long("output")
@@ -120,14 +128,24 @@ fn main() {
             // println!("Downloading from {}", matches.value_of("url").unwrap());
             let wanted_chapter = sub_m
                 .value_of("chapter")
-                .map(|v| v.parse::<u64>().ok().unwrap_or(0));
+                .and_then(|v| v.parse::<u64>().ok());
             let wanted_lecture = sub_m
                 .value_of("lecture")
-                .map(|v| v.parse::<u64>().ok().unwrap_or(0));
+                .and_then(|v| v.parse::<u64>().ok());
+            let wanted_quality = sub_m
+                .value_of("quality")
+                .and_then(|v| v.parse::<u64>().ok());
             let dry_run = sub_m.is_present("dry-run");
             let output = sub_m.value_of("output").unwrap();
 
-            udemy_downloader.download(wanted_chapter, wanted_lecture, output, dry_run, verbose)
+            udemy_downloader.download(
+                wanted_chapter,
+                wanted_lecture,
+                wanted_quality,
+                output,
+                dry_run,
+                verbose,
+            )
         }
         _ => Ok(()),
     };
