@@ -91,9 +91,9 @@ impl<'a> UdemyDownloader<'a> {
         }
     }
 
-    fn extract(&self, verbose: bool) -> Result<CourseContent, Error> {
+    fn get_info(&self, verbose: bool) -> Result<String, Error> {
         if verbose {
-            println!("Requesting info");
+            println!("Requesting subscribed courses");
         }
         let url = format!(
             "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}",
@@ -113,7 +113,15 @@ impl<'a> UdemyDownloader<'a> {
         let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000",
         portal_name = self.portal_name, course_id=course.id);
 
-        let value = self.client.get_as_json(url.as_str())?;
+        if verbose {
+            println!("Requesting info for course");
+        }
+        let value = self.client.get_as_text(url.as_str());
+        value
+    }
+
+    fn parse_info(&self, info: &str) -> Result<CourseContent, Error> {
+        let value = serde_json::from_str(info)?;
         let course_content = self.parser.parse_course_content(&value)?;
         Ok(course_content)
     }
@@ -212,9 +220,16 @@ impl<'a> UdemyDownloader<'a> {
         Ok(())
     }
 
-    pub fn info(&self, verbose: bool) -> Result<(), Error> {
-        let course_content = self.extract(verbose)?;
-        self.print_course_content(&course_content);
+    pub fn info(&self, verbose: bool, wanted_save: Option<&str>) -> Result<(), Error> {
+        let info = self.get_info(verbose)?;
+        if let Some(filename) = wanted_save {
+            save_to_file(filename, info.as_str())?;
+            println!("Course info saved to <{}>", filename);
+        } else {
+            let course_content = self.parse_info(info.as_str())?;
+            self.print_course_content(&course_content);
+        }
+
         Ok(())
     }
 
@@ -225,6 +240,7 @@ impl<'a> UdemyDownloader<'a> {
         wanted_chapter: Option<u64>,
         wanted_lecture: Option<u64>,
         wanted_quality: Option<u64>,
+        wanted_info: Option<&str>,
         output: &str,
         dry_run: bool,
         verbose: bool,
@@ -235,7 +251,11 @@ impl<'a> UdemyDownloader<'a> {
                 wanted_chapter, wanted_lecture, wanted_quality, dry_run
             );
         }
-        let course_content = self.extract(verbose)?;
+        let info = match wanted_info {
+            Some(filename) => load_from_file(filename)?,
+            None => self.get_info(verbose)?,
+        };
+        let course_content = self.parse_info(info.as_str())?;
 
         course_content
             .chapters
@@ -293,7 +313,7 @@ impl<'a> UdemyDownloader<'a> {
 #[cfg(test)]
 mod test_udemy_downloader {
     use failure::Error;
-    use serde_json::{json, Value};
+    use serde_json::Value;
 
     use super::UdemyDownloader;
     use crate::fs_helper::FsHelper;
@@ -310,12 +330,8 @@ mod test_udemy_downloader {
     struct MockHttpClient {}
 
     impl HttpClient for MockHttpClient {
-        // fn has_http_range(&self, url: &str) -> Result<bool, Error> {
-        //     Ok(true)
-        // }
-
-        fn get_as_json(&self, url: &str) -> Result<Value, Error> {
-            println!("get_as_json url={}", url);
+        fn get_as_text(&self, url: &str) -> Result<String, Error> {
+            println!("get_as_text url={}", url);
             unsafe {
                 match GETS_AS_JSON {
                     Some(ref mut gaj) => {
@@ -324,7 +340,7 @@ mod test_udemy_downloader {
                     None => panic!(),
                 }
             };
-            Ok(json!({ "url": url }))
+            Ok(format!(r#"{{ "url": "{}" }}"#, url))
         }
         fn get_content_length(&self, url: &str) -> Result<u64, Error> {
             println!("get_content_length url={}", url);
@@ -473,7 +489,7 @@ mod test_udemy_downloader {
         )
         .unwrap();
 
-        let result = dl.info(true);
+        let result = dl.info(true, None);
 
         assert!(result.is_ok());
 
@@ -513,7 +529,7 @@ mod test_udemy_downloader {
         )
         .unwrap();
 
-        let result = dl.download(Some(1), Some(1), None, "~/Downloads", false, false);
+        let result = dl.download(Some(1), Some(1), None, None, "~/Downloads", false, false);
 
         assert!(result.is_ok());
 

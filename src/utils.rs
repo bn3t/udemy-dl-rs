@@ -1,3 +1,6 @@
+use failure::Error;
+use std::fs;
+
 /// Returns a cross-platform-filename-safe version of any string.
 ///
 /// This is used internally to generate app data directories based on app
@@ -30,6 +33,14 @@ pub fn sanitize(component: &str) -> String {
 
 pub fn calculate_download_speed(total: u64, elapsed: u64) -> f64 {
     (total * 1000u64 / elapsed) as f64 / 1024.0 / 1024.0
+}
+
+pub fn save_to_file(filename: &str, content: &str) -> Result<(), Error> {
+    Ok(fs::write(filename, content)?)
+}
+
+pub fn load_from_file(filename: &str) -> Result<String, Error> {
+    Ok(fs::read_to_string(filename)?)
 }
 
 #[cfg(test)]

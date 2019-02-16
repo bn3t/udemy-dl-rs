@@ -4,7 +4,7 @@ use reqwest::header::{
 };
 use reqwest::Client;
 use reqwest::StatusCode;
-use serde_json::Value;
+use serde_json::{from_str, Value};
 
 const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.21 (KHTML, like Gecko) Mwendo/1.1.5 Safari/537.21";
 const CHUNK: u64 = 2 * 1024 * 1024;
@@ -16,20 +16,26 @@ pub struct UdemyHttpClient {
 }
 
 pub trait HttpClient {
-    fn get_as_json(&self, url: &str) -> Result<Value, Error>;
+    fn get_as_text(&self, url: &str) -> Result<String, Error>;
+    fn get_as_json(&self, url: &str) -> Result<Value, Error> {
+        self.get_as_text(url).map(|text| {
+            from_str(text.as_str())
+                .map_err(|e| format_err!("Error parsing json from url <{}>: {:?}", url, e))
+        })?
+    }
     fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
 }
 
 impl HttpClient for UdemyHttpClient {
-    fn get_as_json(&self, url: &str) -> Result<Value, Error> {
+    fn get_as_text(&self, url: &str) -> Result<String, Error> {
         let mut resp = self
             .client
             .get(url)
             .headers(self.construct_headers())
             .send()?;
         if resp.status().is_success() {
-            Ok(resp.json()?)
+            Ok(resp.text()?)
         } else {
             Err(format_err!(
                 "Error while getting from url <{}>, error: <{}>",

@@ -58,7 +58,17 @@ fn main() {
                 .multiple(true)
                 .help("Sets the level of verbosity"),
         )
-        .subcommand(SubCommand::with_name("info").about("Query course information"))
+        .subcommand(
+            SubCommand::with_name("info")
+                .about("Query course information")
+                .arg(
+                    Arg::with_name("save")
+                        .short("s")
+                        .long("save")
+                        .takes_value(true)
+                        .help("Saves info.json to a file"),
+                ),
+        )
         .subcommand(
             SubCommand::with_name("download")
                 .about("Download course content")
@@ -67,7 +77,7 @@ fn main() {
                         .short("d")
                         .long("dry-run")
                         .takes_value(false)
-                        .help("Dry run, show what's would be done but don't download anything"),
+                        .help("Dry run, show what's would be done but don't download anything."),
                 )
                 .arg(
                     Arg::with_name("chapter")
@@ -75,7 +85,7 @@ fn main() {
                         .long("chapter")
                         .takes_value(true)
                         .value_name("CHAPTER")
-                        .help("Restrict downloads to a specific chapter"),
+                        .help("Restrict downloads to a specific chapter."),
                 )
                 .arg(
                     Arg::with_name("lecture")
@@ -83,7 +93,7 @@ fn main() {
                         .long("lecture")
                         .value_name("LECTURE")
                         .takes_value(true)
-                        .help("Restrict download to a specific lecture"),
+                        .help("Restrict download to a specific lecture."),
                 )
                 .arg(
                     Arg::with_name("quality")
@@ -94,13 +104,21 @@ fn main() {
                         .help("Download specific video quality."),
                 )
                 .arg(
+                    Arg::with_name("info")
+                        .short("i")
+                        .long("info")
+                        .value_name("INFO_FILE")
+                        .takes_value(true)
+                        .help("Load course info from specified file."),
+                )
+                .arg(
                     Arg::with_name("output")
                         .short("o")
                         .long("output")
                         .value_name("OUTPUT_DIR")
                         .takes_value(true)
                         .default_value(".")
-                        .help("Directory where to output downloaded files (default to .)"),
+                        .help("Directory where to output downloaded files (default to .)."),
                 ),
         )
         .get_matches();
@@ -117,12 +135,15 @@ fn main() {
     let udemy_downloader = UdemyDownloader::new(url, &client, &parser, &udemy_helper).unwrap();
 
     let result: Result<(), Error> = match matches.subcommand() {
-        ("info", Some(_sub_m)) => {
-            println!(
-                "Request information from {}",
-                matches.value_of("url").unwrap()
-            );
-            udemy_downloader.info(verbose).map(|_r| ())
+        ("info", Some(sub_m)) => {
+            if verbose {
+                println!(
+                    "Request information from {}",
+                    matches.value_of("url").unwrap()
+                );
+            }
+            let wanted_save = sub_m.value_of("save");
+            udemy_downloader.info(verbose, wanted_save)
         }
         ("download", Some(sub_m)) => {
             // println!("Downloading from {}", matches.value_of("url").unwrap());
@@ -137,11 +158,13 @@ fn main() {
                 .and_then(|v| v.parse::<u64>().ok());
             let dry_run = sub_m.is_present("dry-run");
             let output = sub_m.value_of("output").unwrap();
+            let wanted_info = sub_m.value_of("info");
 
             udemy_downloader.download(
                 wanted_chapter,
                 wanted_lecture,
                 wanted_quality,
+                wanted_info,
                 output,
                 dry_run,
                 verbose,
