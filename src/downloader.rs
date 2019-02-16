@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -116,8 +117,7 @@ impl<'a> UdemyDownloader<'a> {
         if verbose {
             println!("Requesting info for course");
         }
-        let value = self.client.get_as_text(url.as_str());
-        value
+        self.client.get_as_text(url.as_str())
     }
 
     fn parse_info(&self, info: &str) -> Result<CourseContent, Error> {

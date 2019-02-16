@@ -36,7 +36,8 @@ pub fn calculate_download_speed(total: u64, elapsed: u64) -> f64 {
 }
 
 pub fn save_to_file(filename: &str, content: &str) -> Result<(), Error> {
-    Ok(fs::write(filename, content)?)
+    fs::write(filename, content)?;
+    Ok(())
 }
 
 pub fn load_from_file(filename: &str) -> Result<String, Error> {
