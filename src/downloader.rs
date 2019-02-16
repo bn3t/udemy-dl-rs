@@ -185,6 +185,59 @@ impl<'a> UdemyDownloader<'a> {
         Ok(quality)
     }
 
+    fn download_chapter(
+        &self,
+        chapter: &Chapter,
+        wanted_lecture: Option<u64>,
+        wanted_quality: Option<u64>,
+        output: &str,
+        dry_run: bool,
+        verbose: bool,
+    ) -> Result<(), Error> {
+        if verbose {
+            println!(
+                "Downloading chapter {} - {}",
+                chapter.object_index, chapter.title
+            );
+        }
+        let chapter_path = self
+            .udemy_helper
+            .calculate_target_dir(output, &chapter, self.course_name.as_str())
+            .unwrap();
+        if self
+            .udemy_helper
+            .create_target_dir(chapter_path.as_str())
+            .is_ok()
+        {
+            chapter
+                .lectures
+                .iter()
+                .filter(|lecture| lecture.asset.asset_type == "Video")
+                .filter(|lecture| {
+                    wanted_lecture.is_none() || wanted_lecture.unwrap() == lecture.object_index
+                })
+                .for_each(move |lecture| {
+                    match self.download_lecture(
+                        &lecture,
+                        wanted_quality,
+                        chapter_path.as_str(),
+                        dry_run,
+                        verbose,
+                    ) {
+                        Ok(_) => {
+                            // if verbose {
+                            //     println!("Lecture downloaded");
+                            // }
+                        }
+                        Err(e) => {
+                            eprintln!("Error while saving {}: {}", lecture.title, e);
+                        }
+                    };
+                });
+        }
+        Ok(())
+    }
+
     fn download_lecture(
         &self,
         lecture: &Lecture,
@@ -257,55 +310,19 @@ impl<'a> UdemyDownloader<'a> {
         };
         let course_content = self.parse_info(info.as_str())?;
 
-        course_content
-            .chapters
-            .into_iter()
-            .for_each(move |chapter| {
-                if wanted_chapter.is_none() || wanted_chapter.unwrap() == chapter.object_index {
-                    if verbose {
-                        println!(
-                            "Downloading chapter {} - {}",
-                            chapter.object_index, chapter.title
-                        );
-                    }
-                    let chapter_path = self
-                        .udemy_helper
-                        .calculate_target_dir(output, &chapter, self.course_name.as_str())
-                        .unwrap();
-                    if self
-                        .udemy_helper
-                        .create_target_dir(chapter_path.as_str())
-                        .is_ok()
-                    {
-                        chapter
-                            .lectures
-                            .into_iter()
-                            .filter(|lecture| lecture.asset.asset_type == "Video")
-                            .filter(|lecture| {
-                                wanted_lecture.is_none()
-                                    || wanted_lecture.unwrap() == lecture.object_index
-                            })
-                            .for_each(move |lecture| {
-                                match self.download_lecture(
-                                    &lecture,
-                                    wanted_quality,
-                                    chapter_path.as_str(),
-                                    dry_run,
-                                    verbose,
-                                ) {
-                                    Ok(_) => {
-                                        // if verbose {
-                                        //     println!("Lecture downloaded");
-                                        // }
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Error while saving {}: {}", lecture.title, e);
-                                    }
-                                };
-                            });
-                    }
-                }
-            });
+        for chapter in course_content.chapters.iter() {
+            if wanted_chapter.is_none() || wanted_chapter.unwrap() == chapter.object_index {
+                self.download_chapter(
+                    &chapter,
+                    wanted_lecture,
+                    wanted_quality,
+                    output,
+                    dry_run,
+                    verbose,
+                )?;
+            }
+        }
+
         Ok(())
     }
 }
