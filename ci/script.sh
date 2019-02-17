@@ -4,7 +4,6 @@ set -ex
 
 # TODO This is the "test phase", tweak it as you see fit
 main() {
-	echo Travis commit: $TRAVIS_COMMIT
 	cross build --target $TARGET
 	cross build --target $TARGET --release
 
