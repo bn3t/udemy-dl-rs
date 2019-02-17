@@ -16,6 +16,7 @@ mod utils;
 use downloader::UdemyDownloader;
 use fs_helper::UdemyFsHelper;
 use http_client::UdemyHttpClient;
+use model::Auth;
 use parser::UdemyParser;
 use udemy_helper::UdemyHelper;
 
@@ -40,16 +41,25 @@ fn main() {
                 .long("access-token")
                 .value_name("TOKEN")
                 .help("Access token to authenticate to udemy")
-                .required(true)
+                .required(false)
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("client_id")
-                .short("c")
-                .long("client-id")
-                .value_name("CLIENT_ID")
-                .help("Client id to authenticate to udemy")
-                .required(true)
+            Arg::with_name("username")
+                .short("U")
+                .long("username")
+                .value_name("USERNAME")
+                .help("Username to authenticate to udemy")
+                .required_unless("access_token")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("password")
+                .short("p")
+                .long("password")
+                .value_name("PASSWORD")
+                .help("Password to authenticate to udemy")
+                .required_unless("access_token")
                 .takes_value(true),
         )
         .arg(
@@ -125,14 +135,20 @@ fn main() {
 
     let verbose = matches.is_present("verbose");
     let url = matches.value_of("url").unwrap();
-    let access_token = matches.value_of("access_token").unwrap();
-    let client_id = matches.value_of("client_id").unwrap();
+    let access_token = matches.value_of("access_token");
+    let username = matches.value_of("username");
+    let password = matches.value_of("password");
 
     let fs_helper = UdemyFsHelper {};
     let udemy_helper = UdemyHelper::new(&fs_helper);
-    let client = UdemyHttpClient::new(access_token, client_id);
+    let client = UdemyHttpClient::new();
+    let auth = match access_token {
+        Some(access_token) => Auth::with_token(access_token),
+        None => Auth::with_username_password(username.unwrap(), password.unwrap()),
+    };
     let parser = UdemyParser::new();
-    let udemy_downloader = UdemyDownloader::new(url, &client, &parser, &udemy_helper).unwrap();
+    let mut udemy_downloader =
+        UdemyDownloader::new(url, &client, &parser, &udemy_helper, auth).unwrap();
 
     let result: Result<(), Error> = match matches.subcommand() {
         ("info", Some(sub_m)) => {
@@ -143,7 +159,10 @@ fn main() {
                 );
             }
             let wanted_save = sub_m.value_of("save");
-            udemy_downloader.info(verbose, wanted_save)
+
+            udemy_downloader
+                .authenticate()
+                .and(udemy_downloader.info(verbose, wanted_save))
         }
         ("download", Some(sub_m)) => {
             // println!("Downloading from {}", matches.value_of("url").unwrap());
@@ -160,15 +179,17 @@ fn main() {
             let output = sub_m.value_of("output").unwrap();
             let wanted_info = sub_m.value_of("info");
 
-            udemy_downloader.download(
-                wanted_chapter,
-                wanted_lecture,
-                wanted_quality,
-                wanted_info,
-                output,
-                dry_run,
-                verbose,
-            )
+            udemy_downloader
+                .authenticate()
+                .and(udemy_downloader.download(
+                    wanted_chapter,
+                    wanted_lecture,
+                    wanted_quality,
+                    wanted_info,
+                    output,
+                    dry_run,
+                    verbose,
+                ))
         }
         _ => Ok(()),
     };

@@ -4,6 +4,7 @@ use std::io::prelude::*;
 
 use failure::{format_err, Error};
 use regex::Regex;
+use std::collections::HashMap;
 use std::time::Instant;
 
 use indicatif::{ProgressBar, ProgressStyle};
@@ -16,10 +17,13 @@ use crate::utils::*;
 
 const PORTAL_NAME: &str = "www";
 const COURSE_SEARCH: &str = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}";
+const LOGIN_URL: &str =
+    "https://www.udemy.com/api-2.0/auth/udemy-auth/login/?fields[user]=access_token";
 
 pub struct UdemyDownloader<'a> {
     course_name: String,
     portal_name: String,
+    auth: Auth,
     parser: &'a Parser,
     client: &'a HttpClient,
     udemy_helper: &'a UdemyHelper<'a>,
@@ -33,6 +37,7 @@ impl<'a> UdemyDownloader<'a> {
         client: &'a HttpClient,
         parser: &'a Parser,
         udemy_helper: &'a UdemyHelper,
+        auth: Auth,
     ) -> Result<UdemyDownloader<'a>, Error> {
         let re = Regex::new(
             r"(?i)(?://(?P<portal_name>.+?).udemy.com/(?P<course_name>[a-zA-Z0-9_-]+))",
@@ -58,6 +63,7 @@ impl<'a> UdemyDownloader<'a> {
             client,
             parser,
             udemy_helper,
+            auth,
         })
     }
 
@@ -101,7 +107,7 @@ impl<'a> UdemyDownloader<'a> {
             portal_name = self.portal_name,
             course_name = self.course_name
         );
-        let value = self.client.get_as_json(url.as_str())?;
+        let value = self.client.get_as_json(url.as_str(), &self.auth)?;
         let course = self
             .parser
             .parse_subscribed_courses(&value)?
@@ -117,7 +123,7 @@ impl<'a> UdemyDownloader<'a> {
         if verbose {
             println!("Requesting info for course");
         }
-        self.client.get_as_text(url.as_str())
+        self.client.get_as_text(url.as_str(), &self.auth)
     }
 
     fn parse_info(&self, info: &str) -> Result<CourseContent, Error> {
@@ -273,6 +279,34 @@ impl<'a> UdemyDownloader<'a> {
         Ok(())
     }
 
+    pub fn authenticate(&mut self) -> Result<(), Error> {
+        if self.auth.access_token.is_none() {
+            let mut params = HashMap::new();
+            params.insert(
+                "email",
+                self.auth
+                    .username_password
+                    .as_ref()
+                    .unwrap()
+                    .username
+                    .as_str(),
+            );
+            params.insert(
+                "password",
+                self.auth
+                    .username_password
+                    .as_ref()
+                    .unwrap()
+                    .password
+                    .as_str(),
+            );
+
+            let access_token = self.client.post_form(LOGIN_URL, &params)?;
+            self.auth.access_token = Some(access_token);
+        }
+        Ok(())
+    }
+
     pub fn info(&self, verbose: bool, wanted_save: Option<&str>) -> Result<(), Error> {
         let info = self.get_info(verbose)?;
         if let Some(filename) = wanted_save {
@@ -331,6 +365,7 @@ impl<'a> UdemyDownloader<'a> {
 mod test_udemy_downloader {
     use failure::Error;
     use serde_json::Value;
+    use std::collections::HashMap;
 
     use super::UdemyDownloader;
     use crate::fs_helper::FsHelper;
@@ -347,7 +382,7 @@ mod test_udemy_downloader {
     struct MockHttpClient {}
 
     impl HttpClient for MockHttpClient {
-        fn get_as_text(&self, url: &str) -> Result<String, Error> {
+        fn get_as_text(&self, url: &str, _auth: &Auth) -> Result<String, Error> {
             println!("get_as_text url={}", url);
             unsafe {
                 match GETS_AS_JSON {
@@ -382,6 +417,9 @@ mod test_udemy_downloader {
                 }
             };
             Ok(vec![])
+        }
+        fn post_form(&self, _url: &str, _params: &HashMap<&str, &str>) -> Result<String, Error> {
+            Ok("blah".into())
         }
     }
 
@@ -469,11 +507,13 @@ mod test_udemy_downloader {
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
             &udemy_helper,
+            auth,
         )
         .unwrap();
 
@@ -498,11 +538,13 @@ mod test_udemy_downloader {
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
             &udemy_helper,
+            auth,
         )
         .unwrap();
 
@@ -538,11 +580,13 @@ mod test_udemy_downloader {
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
             &udemy_helper,
+            auth,
         )
         .unwrap();
 
@@ -579,11 +623,13 @@ mod test_udemy_downloader {
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
             &udemy_helper,
+            auth,
         )
         .unwrap();
 
@@ -619,11 +665,13 @@ mod test_udemy_downloader {
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
             &udemy_helper,
+            auth,
         )
         .unwrap();
 
@@ -664,11 +712,13 @@ mod test_udemy_downloader {
         let mock_http_client = MockHttpClient {};
         let mock_parser = MockParser::new();
         let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
         let dl = UdemyDownloader::new(
             "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
             &udemy_helper,
+            auth,
         )
         .unwrap();
 
