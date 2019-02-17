@@ -1,4 +1,5 @@
 
+# Download udemy courses in batch. [![Build Status](https://travis-ci.org/bn3t/udemy-dl-rs.svg?branch=develop)](https://travis-ci.org/bn3t/udemy-dl-rs)
 
 # Usage
 
