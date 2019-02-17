@@ -26,6 +26,7 @@ fn main() {
         .author("Bernard Niset")
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .setting(AppSettings::SubcommandRequiredElseHelp)
+        .after_help(format!("Build: {} - {}", env!("GIT_COMMIT"), env!("BUILD_DATE")).as_str())
         .arg(
             Arg::with_name("url")
                 .short("u")
