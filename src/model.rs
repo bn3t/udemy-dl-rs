@@ -47,3 +47,41 @@ pub struct Chapter {
 pub struct CourseContent {
     pub chapters: Vec<Chapter>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AuthResponse {
+    pub _class: String,
+    pub id: u32,
+    pub access_token: String,
+}
+
+#[derive(Debug)]
+pub struct UsernamePassword {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug)]
+pub struct Auth {
+    pub access_token: Option<String>,
+    pub username_password: Option<UsernamePassword>,
+}
+
+impl Auth {
+    pub fn with_token(access_token: &str) -> Auth {
+        Auth {
+            access_token: Some(access_token.into()),
+            username_password: None,
+        }
+    }
+
+    pub fn with_username_password(username: &str, password: &str) -> Auth {
+        Auth {
+            access_token: None,
+            username_password: Some(UsernamePassword {
+                username: username.into(),
+                password: password.into(),
+            }),
+        }
+    }
+}
