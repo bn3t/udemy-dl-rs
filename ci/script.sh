@@ -11,8 +11,10 @@ main() {
 		return
 	fi
 
-	cross test --target $TARGET -- --test-threads=1
-	cross test --target $TARGET --release -- --test-threads=1
+	if [[ ! $TARGET == *"windows"* ]]; then
+		cross test --target $TARGET -- --test-threads=1
+		cross test --target $TARGET --release -- --test-threads=1
+	fi
 
 	# cross run --target $TARGET -- -v
 	# cross run --target $TARGET --release -- -v
