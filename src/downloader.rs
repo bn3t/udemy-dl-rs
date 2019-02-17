@@ -1,13 +1,11 @@
 #![allow(clippy::too_many_arguments)]
 use std::fs::File;
 use std::io::prelude::*;
-
-use failure::{format_err, Error};
-use regex::Regex;
-use std::collections::HashMap;
 use std::time::Instant;
 
+use failure::{format_err, Error};
 use indicatif::{ProgressBar, ProgressStyle};
+use regex::Regex;
 
 use crate::http_client::HttpClient;
 use crate::model::*;
@@ -281,27 +279,7 @@ impl<'a> UdemyDownloader<'a> {
 
     pub fn authenticate(&mut self) -> Result<(), Error> {
         if self.auth.access_token.is_none() {
-            let mut params = HashMap::new();
-            params.insert(
-                "email",
-                self.auth
-                    .username_password
-                    .as_ref()
-                    .unwrap()
-                    .username
-                    .as_str(),
-            );
-            params.insert(
-                "password",
-                self.auth
-                    .username_password
-                    .as_ref()
-                    .unwrap()
-                    .password
-                    .as_str(),
-            );
-
-            let access_token = self.client.post_form(LOGIN_URL, &params)?;
+            let access_token = self.client.post_login_form(LOGIN_URL, &self.auth)?;
             self.auth.access_token = Some(access_token);
         }
         Ok(())
@@ -365,7 +343,6 @@ impl<'a> UdemyDownloader<'a> {
 mod test_udemy_downloader {
     use failure::Error;
     use serde_json::Value;
-    use std::collections::HashMap;
 
     use super::UdemyDownloader;
     use crate::fs_helper::FsHelper;
@@ -418,7 +395,7 @@ mod test_udemy_downloader {
             };
             Ok(vec![])
         }
-        fn post_form(&self, _url: &str, _params: &HashMap<&str, &str>) -> Result<String, Error> {
+        fn post_login_form(&self, _url: &str, _auth: &Auth) -> Result<String, Error> {
             Ok("blah".into())
         }
     }

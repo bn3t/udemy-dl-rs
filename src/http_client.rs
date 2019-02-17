@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use failure::{format_err, Error};
 use reqwest::header::{
     HeaderMap, HeaderName, HeaderValue, ACCEPT_RANGES, AUTHORIZATION, HOST, RANGE, USER_AGENT,
@@ -5,7 +7,6 @@ use reqwest::header::{
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{from_str, Value};
-use std::collections::HashMap;
 
 use crate::model::{Auth, AuthResponse};
 
@@ -26,7 +27,7 @@ pub trait HttpClient {
     }
     fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
-    fn post_form(&self, url: &str, params: &HashMap<&str, &str>) -> Result<String, Error>;
+    fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error>;
 }
 
 impl HttpClient for UdemyHttpClient {
@@ -114,14 +115,29 @@ impl HttpClient for UdemyHttpClient {
         }
     }
 
-    fn post_form(&self, url: &str, params: &HashMap<&str, &str>) -> Result<String, Error> {
+    fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error> {
         let mut headers = HeaderMap::new();
 
         headers.insert(HOST, "www.udemy.com".parse().unwrap());
         headers.insert(AUTHORIZATION, "Basic YWQxMmVjYTljYmUxN2FmYWM2MjU5ZmU1ZDk4NDcxYTY6YTdjNjMwNjQ2MzA4ODI0YjIzMDFmZGI2MGVjZmQ4YTA5NDdlODJkNQ==".parse().unwrap());
         headers.insert(USER_AGENT, DEFAULT_UA.parse().unwrap());
 
-        let mut response = self.client.post(url).headers(headers).form(params).send()?;
+        let mut params = HashMap::new();
+        params.insert(
+            "email",
+            auth.username_password.as_ref().unwrap().username.as_str(),
+        );
+        params.insert(
+            "password",
+            auth.username_password.as_ref().unwrap().password.as_str(),
+        );
+
+        let mut response = self
+            .client
+            .post(url)
+            .headers(headers)
+            .form(&params)
+            .send()?;
         let auth_response: AuthResponse = response.json()?;
         // println!("access_token={}", auth_response.access_token);
         Ok(auth_response.access_token)
