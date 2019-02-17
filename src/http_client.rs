@@ -1,38 +1,41 @@
+use std::collections::HashMap;
+
 use failure::{format_err, Error};
 use reqwest::header::{
-    HeaderMap, HeaderName, HeaderValue, ACCEPT_RANGES, AUTHORIZATION, RANGE, USER_AGENT,
+    HeaderMap, HeaderName, HeaderValue, ACCEPT_RANGES, AUTHORIZATION, HOST, RANGE, USER_AGENT,
 };
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{from_str, Value};
 
+use crate::model::{Auth, AuthResponse};
+
 const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.21 (KHTML, like Gecko) Mwendo/1.1.5 Safari/537.21";
 const CHUNK: u64 = 2 * 1024 * 1024;
 
 pub struct UdemyHttpClient {
-    access_token: String,
-    client_id: String,
     client: Client,
 }
 
 pub trait HttpClient {
-    fn get_as_text(&self, url: &str) -> Result<String, Error>;
-    fn get_as_json(&self, url: &str) -> Result<Value, Error> {
-        self.get_as_text(url).map(|text| {
+    fn get_as_text(&self, url: &str, auth: &Auth) -> Result<String, Error>;
+    fn get_as_json(&self, url: &str, auth: &Auth) -> Result<Value, Error> {
+        self.get_as_text(url, auth).map(|text| {
             from_str(text.as_str())
                 .map_err(|e| format_err!("Error parsing json from url <{}>: {:?}", url, e))
         })?
     }
     fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
+    fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error>;
 }
 
 impl HttpClient for UdemyHttpClient {
-    fn get_as_text(&self, url: &str) -> Result<String, Error> {
+    fn get_as_text(&self, url: &str, auth: &Auth) -> Result<String, Error> {
         let mut resp = self
             .client
             .get(url)
-            .headers(self.construct_headers())
+            .headers(self.construct_headers(auth))
             .send()?;
         if resp.status().is_success() {
             Ok(resp.text()?)
@@ -111,17 +114,40 @@ impl HttpClient for UdemyHttpClient {
             }
         }
     }
+
+    fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error> {
+        let mut headers = HeaderMap::new();
+
+        headers.insert(HOST, "www.udemy.com".parse().unwrap());
+        headers.insert(AUTHORIZATION, "Basic YWQxMmVjYTljYmUxN2FmYWM2MjU5ZmU1ZDk4NDcxYTY6YTdjNjMwNjQ2MzA4ODI0YjIzMDFmZGI2MGVjZmQ4YTA5NDdlODJkNQ==".parse().unwrap());
+        headers.insert(USER_AGENT, DEFAULT_UA.parse().unwrap());
+
+        let mut params = HashMap::new();
+        params.insert(
+            "email",
+            auth.username_password.as_ref().unwrap().username.as_str(),
+        );
+        params.insert(
+            "password",
+            auth.username_password.as_ref().unwrap().password.as_str(),
+        );
+
+        let mut response = self
+            .client
+            .post(url)
+            .headers(headers)
+            .form(&params)
+            .send()?;
+        let auth_response: AuthResponse = response.json()?;
+        // println!("access_token={}", auth_response.access_token);
+        Ok(auth_response.access_token)
+    }
 }
 
 impl UdemyHttpClient {
-    pub fn new(access_token: &str, client_id: &str) -> UdemyHttpClient {
+    pub fn new() -> UdemyHttpClient {
         let client = Client::new();
-
-        UdemyHttpClient {
-            client,
-            access_token: String::from(access_token),
-            client_id: String::from(client_id),
-        }
+        UdemyHttpClient { client }
     }
 
     fn has_http_range(&self, url: &str) -> Result<bool, Error> {
@@ -132,9 +158,9 @@ impl UdemyHttpClient {
             .map_err(|_e| format_err!("Could not check http range"))
     }
 
-    fn construct_headers(&self) -> HeaderMap {
+    fn construct_headers(&self, auth: &Auth) -> HeaderMap {
         let mut headers = HeaderMap::new();
-        let bearer = format!("Bearer {}", self.access_token);
+        let bearer = format!("Bearer {}", auth.access_token.as_ref().unwrap());
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(bearer.as_str()).unwrap(),
