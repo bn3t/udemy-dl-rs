@@ -96,7 +96,7 @@ impl<'a> UdemyDownloader<'a> {
         }
     }
 
-    fn get_info(&self, verbose: bool) -> Result<String, Error> {
+    fn get_subscribed_course(&self, verbose: bool) -> Result<Course, Error> {
         if verbose {
             println!("Requesting subscribed courses");
         }
@@ -106,15 +106,14 @@ impl<'a> UdemyDownloader<'a> {
             course_name = self.course_name
         );
         let value = self.client.get_as_json(url.as_str(), &self.auth)?;
-        let course = self
-            .parser
+        self.parser
             .parse_subscribed_courses(&value)?
             .into_iter()
             .find(|course| course.published_title == self.course_name)
-            .ok_or_else(|| {
-                format_err!("{} was not found in subscribed courses", self.course_name)
-            })?;
+            .ok_or_else(|| format_err!("{} was not found in subscribed courses", self.course_name))
+    }
 
+    fn get_info(&self, course: &Course, verbose: bool) -> Result<String, Error> {
         let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000",
         portal_name = self.portal_name, course_id=course.id);
 
@@ -187,6 +186,63 @@ impl<'a> UdemyDownloader<'a> {
             .map(|q| q.to_string())
             .ok_or_else(|| format_err!("No best quality could be found"))?;
         Ok(quality)
+    }
+
+    fn complete_chapter(
+        &self,
+        course_id: u64,
+        chapter: &Chapter,
+        wanted_lecture: Option<u64>,
+        verbose: bool,
+    ) -> Result<(), Error> {
+        if verbose {
+            println!(
+                "Completing chapter {} - {}",
+                chapter.object_index, chapter.title
+            );
+        }
+        chapter
+            .lectures
+            .iter()
+            .filter(|lecture| {
+                wanted_lecture.is_none() || wanted_lecture.unwrap() == lecture.object_index
+            })
+            .for_each(move |lecture| {
+                match self.complete_lecture(course_id, &lecture, verbose) {
+                    Ok(_) => {
+                        // if verbose {
+                        //     println!("Lecture downloaded");
+                        // }
+                    }
+                    Err(e) => {
+                        eprintln!("Error while completing {}: {}", lecture.title, e);
+                    }
+                };
+            });
+        Ok(())
+    }
+
+    fn complete_lecture(
+        &self,
+        course_id: u64,
+        lecture: &Lecture,
+        verbose: bool,
+    ) -> Result<(), Error> {
+        if verbose {
+            println!("Completing lecture {}", lecture.title);
+        }
+        let url = format!(
+            "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses/{course_id}/completed-lectures/",
+            portal_name = self.portal_name,
+            course_id = course_id
+        );
+        let complete_request = CompleteRequest {
+            lecture_id: lecture.id,
+            downloaded: false,
+        };
+        let value = serde_json::to_value(complete_request)?;
+        self.client.post_json(url.as_str(), &value, &self.auth)?;
+        Ok(())
     }
 
     fn download_chapter(
@@ -286,7 +342,8 @@ impl<'a> UdemyDownloader<'a> {
     }
 
     pub fn info(&self, verbose: bool, wanted_save: Option<&str>) -> Result<(), Error> {
-        let info = self.get_info(verbose)?;
+        let course = self.get_subscribed_course(verbose)?;
+        let info = self.get_info(&course, verbose)?;
         if let Some(filename) = wanted_save {
             save_to_file(filename, info.as_str())?;
             println!("Course info saved to <{}>", filename);
@@ -318,7 +375,9 @@ impl<'a> UdemyDownloader<'a> {
         }
         let info = match wanted_info {
             Some(filename) => load_from_file(filename)?,
-            None => self.get_info(verbose)?,
+            None => self
+                .get_subscribed_course(verbose)
+                .and_then(|course| self.get_info(&course, verbose))?,
         };
         let course_content = self.parse_info(info.as_str())?;
 
@@ -335,6 +394,31 @@ impl<'a> UdemyDownloader<'a> {
             }
         }
 
+        Ok(())
+    }
+
+    /// Complete chapters and lectures.
+    pub fn complete(
+        &self,
+        wanted_chapter: u64,
+        wanted_lecture: Option<u64>,
+        verbose: bool,
+    ) -> Result<(), Error> {
+        if verbose {
+            println!(
+                "Complete chapter: {}, lecture: {:?}",
+                wanted_chapter, wanted_lecture
+            );
+        }
+        let course = self.get_subscribed_course(verbose)?;
+        let info = self.get_info(&course, verbose)?;
+        let course_content = self.parse_info(info.as_str())?;
+
+        for chapter in course_content.chapters.iter() {
+            if wanted_chapter == chapter.object_index {
+                self.complete_chapter(course.id, &chapter, wanted_lecture, verbose)?;
+            }
+        }
         Ok(())
     }
 }
@@ -398,6 +482,9 @@ mod test_udemy_downloader {
         fn post_login_form(&self, _url: &str, _auth: &Auth) -> Result<String, Error> {
             Ok("blah".into())
         }
+        fn post_json(&self, _url: &str, _json: &Value, _auth: &Auth) -> Result<(), Error> {
+            Ok(())
+        }
     }
 
     struct MockParser {}
@@ -443,6 +530,7 @@ mod test_udemy_downloader {
                     object_index: 1,
                     title: "The Chapter".into(),
                     lectures: vec![Lecture {
+                        id: 4321,
                         object_index: 1,
                         title: "The Lecture".into(),
                         asset: Asset {

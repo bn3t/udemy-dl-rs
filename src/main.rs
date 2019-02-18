@@ -81,6 +81,27 @@ fn main() {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("complete")
+                .about("Mark courses as completed")
+                .arg(
+                    Arg::with_name("chapter")
+                        .short("c")
+                        .long("chapter")
+                        .takes_value(true)
+                        .value_name("CHAPTER")
+                        .required(true)
+                        .help("Restrict marking a specific chapter."),
+                )
+                .arg(
+                    Arg::with_name("lecture")
+                        .short("l")
+                        .long("lecture")
+                        .value_name("LECTURE")
+                        .takes_value(true)
+                        .help("Restrict marking a specific lecture."),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("download")
                 .about("Download course content")
                 .arg(
@@ -191,6 +212,20 @@ fn main() {
                     dry_run,
                     verbose,
                 ))
+        }
+        ("complete", Some(sub_m)) => {
+            // println!("Downloading from {}", matches.value_of("url").unwrap());
+            let wanted_chapter = sub_m
+                .value_of("chapter")
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap();
+            let wanted_lecture = sub_m
+                .value_of("lecture")
+                .and_then(|v| v.parse::<u64>().ok());
+
+            udemy_downloader
+                .authenticate()
+                .and(udemy_downloader.complete(wanted_chapter, wanted_lecture, verbose))
         }
         _ => Ok(()),
     };

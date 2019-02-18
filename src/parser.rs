@@ -138,6 +138,11 @@ impl Parser for UdemyParser {
                         .ok_or_else(|| format_err!("Error parsing json"))?,
                 )?;
                 lectures.push(Lecture {
+                    id: item
+                        .get("id")
+                        .ok_or_else(|| format_err!("Error parsing json"))?
+                        .as_u64()
+                        .ok_or_else(|| format_err!("Error parsing json"))?,
                     object_index: item
                         .get("object_index")
                         .ok_or_else(|| format_err!("Error parsing json"))?
