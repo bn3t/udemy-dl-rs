@@ -11,6 +11,7 @@ mod downloader;
 mod fs_helper;
 mod http_client;
 mod info;
+mod mocks;
 mod model;
 mod parser;
 mod test_data;

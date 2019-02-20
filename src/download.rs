@@ -253,3 +253,195 @@ impl Download {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::mocks::*;
+    use crate::test_data::*;
+    use crate::udemy_helper::UdemyHelper;
+
+    #[test]
+    fn download() {
+        unsafe {
+            PARSE = Some(vec![]);
+            GETS_AS_JSON = Some(vec![]);
+            GETS_CONTENT_LENGTH = Some(vec![]);
+            GETS_AS_DATA = Some(vec![]);
+        }
+
+        let fs_helper = MockFsHelper {};
+
+        let mock_http_client = MockHttpClient {};
+        let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
+
+        let mut context = CommandContext::new(
+            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            &mock_http_client,
+            &mock_parser,
+            &udemy_helper,
+            auth,
+        )
+        .unwrap();
+
+        context.course = Some(make_course());
+        context.course_content = Some(make_test_course_content());
+
+        let mut download = Download::new();
+        download.set_params(&DownloadParams {
+            wanted_chapter: Some(1),
+            wanted_lecture: Some(1),
+            wanted_quality: None,
+            output: "~/Downloads".into(),
+            dry_run: false,
+            verbose: false,
+        });
+
+        let result = download.execute(&context);
+
+        assert!(result.is_ok());
+
+        unsafe {
+            // if let Some(ref gaj) = GETS_AS_JSON {
+            //     assert_eq!(gaj.len(), 2);
+            //     assert_eq!(gaj[0], "https://www.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search=css-the-complete-guide-incl-flexbox-grid-sass");
+            //     assert_eq!(gaj[1], "https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000");
+            // }
+            if let Some(ref gcl) = GETS_CONTENT_LENGTH {
+                assert_eq!(gcl.len(), 1);
+                assert_eq!(gcl[0], "http://host-name/the-filename.mp4");
+            }
+            if let Some(ref gad) = GETS_AS_DATA {
+                assert_eq!(gad.len(), 1);
+                assert_eq!(gad[0], "http://host-name/the-filename.mp4");
+            }
+            // if let Some(ref psc) = PARSE {
+            //     assert_eq!(psc.len(), 2);
+            //     assert_eq!(psc[0], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search=css-the-complete-guide-incl-flexbox-grid-sass\")})");
+            //     assert_eq!(psc[1], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000\")})");
+            // }
+        }
+    }
+
+    #[test]
+    fn determine_quality_for_best() {
+        let download_urls = vec![
+            DownloadUrl {
+                label: "480".into(),
+                file: "the-file-video-480".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "720".into(),
+                file: "the-file-video-720".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "1720".into(),
+                file: "the-file-720".into(),
+                r#type: Some("other/mp4".into()),
+            },
+        ];
+        let wanted_quality = None;
+
+        let mut download = Download::new();
+        download.set_params(&DownloadParams {
+            wanted_chapter: Some(1),
+            wanted_lecture: Some(1),
+            wanted_quality: None,
+            output: "~/Downloads".into(),
+            dry_run: false,
+            verbose: false,
+        });
+
+        let actual = download.determine_quality(&download_urls, wanted_quality);
+
+        assert_eq!(actual.is_ok(), true);
+        assert_eq!(actual.unwrap(), "720");
+    }
+
+    #[test]
+    fn determine_quality_for_wanted_480() {
+        let download_urls = vec![
+            DownloadUrl {
+                label: "480".into(),
+                file: "the-file-video-480".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "360".into(),
+                file: "the-file-video-360".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "720".into(),
+                file: "the-file-video-720".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "1720".into(),
+                file: "the-file-720".into(),
+                r#type: Some("other/mp4".into()),
+            },
+        ];
+        let wanted_quality = Some(480u64);
+        let mut download = Download::new();
+        download.set_params(&DownloadParams {
+            wanted_chapter: Some(1),
+            wanted_lecture: Some(1),
+            wanted_quality: None,
+            output: "~/Downloads".into(),
+            dry_run: false,
+            verbose: false,
+        });
+
+        let actual = download.determine_quality(&download_urls, wanted_quality);
+
+        assert_eq!(actual.is_ok(), true);
+        assert_eq!(actual.unwrap(), "480");
+    }
+
+    #[test]
+    fn determine_quality_for_wanted_470() {
+        let download_urls = vec![
+            DownloadUrl {
+                label: "480".into(),
+                file: "the-file-video-480".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "360".into(),
+                file: "the-file-video-360".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "720".into(),
+                file: "the-file-video-720".into(),
+                r#type: Some("video/mp4".into()),
+            },
+            DownloadUrl {
+                label: "1720".into(),
+                file: "the-file-720".into(),
+                r#type: Some("other/mp4".into()),
+            },
+        ];
+        let wanted_quality = Some(470u64);
+        let mut download = Download::new();
+        download.set_params(&DownloadParams {
+            wanted_chapter: Some(1),
+            wanted_lecture: Some(1),
+            wanted_quality: None,
+            output: "~/Downloads".into(),
+            dry_run: false,
+            verbose: false,
+        });
+
+        let actual = download.determine_quality(&download_urls, wanted_quality);
+
+        assert_eq!(actual.is_ok(), true);
+        assert_eq!(actual.unwrap(), "480");
+    }
+}

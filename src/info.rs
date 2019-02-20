@@ -66,3 +66,44 @@ impl Info {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use crate::downloader::UdemyDownloader;
+    use crate::mocks::*;
+    use crate::test_data::*;
+    use crate::udemy_helper::UdemyHelper;
+
+    #[test]
+    fn info() {
+        let fs_helper = MockFsHelper {};
+
+        let mock_http_client = MockHttpClient {};
+        let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
+
+        let mut context = CommandContext::new(
+            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            &mock_http_client,
+            &mock_parser,
+            &udemy_helper,
+            auth,
+        )
+        .unwrap();
+
+        context.course = Some(make_course());
+        context.course_content = Some(make_test_course_content());
+        let downloader = UdemyDownloader::new(&mut context);
+
+        let mut info = Info::new();
+        info.set_params(&InfoParams { verbose: true });
+
+        let result = downloader.execute(&info);
+
+        assert!(result.is_ok());
+    }
+}
