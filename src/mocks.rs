@@ -70,7 +70,7 @@ impl Parser for MockParser {
     fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error> {
         unsafe {
             match PARSE {
-                Some(ref mut psc) => psc.push(String::from(format!("{:?}", subscribed_courses))),
+                Some(ref mut psc) => psc.push(format!("{:?}", subscribed_courses)),
                 None => {
                     panic!();
                 }
@@ -85,7 +85,7 @@ impl Parser for MockParser {
     fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error> {
         unsafe {
             match PARSE {
-                Some(ref mut psc) => psc.push(String::from(format!("{:?}", full_course))),
+                Some(ref mut psc) => psc.push(format!("{:?}", full_course)),
                 None => {
                     panic!();
                 }

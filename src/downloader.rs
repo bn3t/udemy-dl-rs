@@ -1,5 +1,3 @@
-#![allow(clippy::too_many_arguments)]
-
 use failure::{format_err, Error};
 
 use crate::command::*;

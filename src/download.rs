@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use std::any::Any;
 use std::fs::File;
 use std::io::prelude::*;
