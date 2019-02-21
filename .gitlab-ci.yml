@@ -64,7 +64,7 @@ test-fmt:
 test-clippy:
   <<: *rust_test_template
   variables:
-    RUSTUP_TOOLCHAIN: nightly
+    RUSTUP_TOOLCHAIN: stable
   script:
     - cargo clippy --all -- -D warnings
     
