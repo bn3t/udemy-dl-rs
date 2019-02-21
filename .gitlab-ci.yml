@@ -66,6 +66,7 @@ test-clippy:
   variables:
     RUSTUP_TOOLCHAIN: stable
   script:
+    - rustup component add clippy
     - cargo clippy --all -- -D warnings
     
 test-prerelase:
