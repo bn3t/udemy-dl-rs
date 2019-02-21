@@ -104,9 +104,9 @@ mod test_udemy_downloader {
     fn parse_url() {
         unsafe {
             PARSE = Some(vec![]);
-            GETS_AS_JSON = Some(vec![]);
-            GETS_CONTENT_LENGTH = Some(vec![]);
-            GETS_AS_DATA = Some(vec![]);
+            GETS_AS_JSON_URL = Some(vec![]);
+            GETS_CONTENT_LENGTH_URL = Some(vec![]);
+            GETS_AS_DATA_URL = Some(vec![]);
         }
 
         let fs_helper = MockFsHelper {};

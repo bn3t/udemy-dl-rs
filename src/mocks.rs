@@ -59,7 +59,7 @@ impl HttpClient for MockHttpClient {
         unsafe {
             match POST_JSON_DATA_BODY {
                 Some(ref mut pjdb) => {
-                    pjdb.push(String::from(to_string(json).unwrap_or("failed".into())));
+                    pjdb.push(to_string(json).unwrap_or_else(|_| "failed".into()));
                 }
                 None => panic!(),
             }

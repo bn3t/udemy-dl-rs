@@ -268,9 +268,9 @@ mod test {
     fn download() {
         unsafe {
             PARSE = Some(vec![]);
-            GETS_AS_JSON = Some(vec![]);
-            GETS_CONTENT_LENGTH = Some(vec![]);
-            GETS_AS_DATA = Some(vec![]);
+            GETS_AS_JSON_URL = Some(vec![]);
+            GETS_CONTENT_LENGTH_URL = Some(vec![]);
+            GETS_AS_DATA_URL = Some(vec![]);
         }
 
         let fs_helper = MockFsHelper {};
@@ -307,24 +307,14 @@ mod test {
         assert!(result.is_ok());
 
         unsafe {
-            // if let Some(ref gaj) = GETS_AS_JSON {
-            //     assert_eq!(gaj.len(), 2);
-            //     assert_eq!(gaj[0], "https://www.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search=css-the-complete-guide-incl-flexbox-grid-sass");
-            //     assert_eq!(gaj[1], "https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000");
-            // }
-            if let Some(ref gcl) = GETS_CONTENT_LENGTH {
+            if let Some(ref gcl) = GETS_CONTENT_LENGTH_URL {
                 assert_eq!(gcl.len(), 1);
                 assert_eq!(gcl[0], "http://host-name/the-filename.mp4");
             }
-            if let Some(ref gad) = GETS_AS_DATA {
+            if let Some(ref gad) = GETS_AS_DATA_URL {
                 assert_eq!(gad.len(), 1);
                 assert_eq!(gad[0], "http://host-name/the-filename.mp4");
             }
-            // if let Some(ref psc) = PARSE {
-            //     assert_eq!(psc.len(), 2);
-            //     assert_eq!(psc[0], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search=css-the-complete-guide-incl-flexbox-grid-sass\")})");
-            //     assert_eq!(psc[1], "Object({\"url\": String(\"https://www.udemy.com/api-2.0/courses/54321/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000\")})");
-            // }
         }
     }
 
