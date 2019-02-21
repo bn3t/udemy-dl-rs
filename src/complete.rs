@@ -134,3 +134,68 @@ impl Complete {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::mocks::*;
+    use crate::test_data::*;
+    use crate::udemy_helper::UdemyHelper;
+
+    #[test]
+    fn complete() {
+        unsafe {
+            PARSE = Some(vec![]);
+            GETS_AS_JSON_URL = Some(vec![]);
+            GETS_CONTENT_LENGTH_URL = Some(vec![]);
+            GETS_AS_DATA_URL = Some(vec![]);
+            POST_JSON_DATA_URL = Some(vec![]);
+            POST_JSON_DATA_BODY = Some(vec![]);
+        }
+
+        let fs_helper = MockFsHelper {};
+
+        let mock_http_client = MockHttpClient {};
+        let mock_parser = MockParser::new();
+        let udemy_helper = UdemyHelper::new(&fs_helper);
+        let auth = Auth::with_token("blah");
+
+        let mut context = CommandContext::new(
+            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            &mock_http_client,
+            &mock_parser,
+            &udemy_helper,
+            auth,
+        )
+        .unwrap();
+
+        context.course = Some(make_course());
+        context.course_content = Some(make_test_course_content());
+
+        let mut complete = Complete::new();
+        complete.set_params(&CompleteParams {
+            wanted_chapter: 1,
+            wanted_lecture: Some(1),
+            verbose: false,
+        });
+
+        let result = complete.execute(&context);
+
+        assert!(result.is_ok());
+
+        unsafe {
+            if let Some(ref pjd) = POST_JSON_DATA_URL {
+                assert_eq!(pjd.len(), 1);
+                assert_eq!(pjd[0], "https://www.udemy.com/api-2.0/users/me/subscribed-courses/54321/completed-lectures/");
+            }
+            if let Some(ref pjdb) = POST_JSON_DATA_BODY {
+                assert_eq!(pjdb.len(), 1);
+                assert_eq!(pjdb[0], "{\"downloaded\":false,\"lecture_id\":4321}");
+            }
+        }
+    }
+
+    #[test]
+    fn complte() {}
+}
