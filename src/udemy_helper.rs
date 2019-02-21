@@ -97,6 +97,7 @@ mod test_udemy_helper {
     #[test]
     fn calculate_target_file() {
         let lecture = Lecture {
+            id: 4321,
             object_index: 32,
             title: "The Lecture".into(),
             asset: Asset {

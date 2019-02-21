@@ -1,3 +1,38 @@
+use crate::model::*;
+
+pub fn make_course() -> Course {
+    Course {
+        id: 54321,
+        url: "the-url".into(),
+        published_title: "css-the-complete-guide-incl-flexbox-grid-sass".into(),
+    }
+}
+
+pub fn make_test_course_content() -> CourseContent {
+    CourseContent {
+        chapters: vec![Chapter {
+            object_index: 1,
+            title: "The Chapter".into(),
+            lectures: vec![Lecture {
+                id: 4321,
+                object_index: 1,
+                title: "The Lecture".into(),
+                asset: Asset {
+                    filename: "the-filename.mp4".into(),
+                    asset_type: "Video".into(),
+                    time_estimation: 321,
+                    download_urls: Some(vec![DownloadUrl {
+                        r#type: Some("video/mp4".into()),
+                        file: "http://host-name/the-filename.mp4".into(),
+                        label: "720".into(),
+                    }]),
+                },
+                supplementary_assets: vec![],
+            }],
+        }],
+    }
+}
+
 pub const TEST_SUBSCRIBED_COURSES: &str = r#"{
       "count": 13,
       "next": null,

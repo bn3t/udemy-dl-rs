@@ -2,20 +2,29 @@
 
 use clap::{App, AppSettings, Arg, SubCommand};
 
-use failure::Error;
+use failure::{format_err, Error};
 
+mod command;
+mod complete;
+mod download;
 mod downloader;
 mod fs_helper;
 mod http_client;
+mod info;
+mod mocks;
 mod model;
 mod parser;
 mod test_data;
 mod udemy_helper;
 mod utils;
 
+use command::*;
+use complete::*;
+use download::*;
 use downloader::UdemyDownloader;
 use fs_helper::UdemyFsHelper;
 use http_client::UdemyHttpClient;
+use info::*;
 use model::Auth;
 use parser::UdemyParser;
 use udemy_helper::UdemyHelper;
@@ -69,15 +78,26 @@ fn main() {
                 .multiple(true)
                 .help("Sets the level of verbosity"),
         )
+        .subcommand(SubCommand::with_name("info").about("Query course information"))
         .subcommand(
-            SubCommand::with_name("info")
-                .about("Query course information")
+            SubCommand::with_name("complete")
+                .about("Mark courses as completed")
                 .arg(
-                    Arg::with_name("save")
-                        .short("s")
-                        .long("save")
+                    Arg::with_name("chapter")
+                        .short("c")
+                        .long("chapter")
                         .takes_value(true)
-                        .help("Saves info.json to a file"),
+                        .value_name("CHAPTER")
+                        .required(true)
+                        .help("Restrict marking a specific chapter."),
+                )
+                .arg(
+                    Arg::with_name("lecture")
+                        .short("l")
+                        .long("lecture")
+                        .value_name("LECTURE")
+                        .takes_value(true)
+                        .help("Restrict marking a specific lecture."),
                 ),
         )
         .subcommand(
@@ -115,14 +135,6 @@ fn main() {
                         .help("Download specific video quality."),
                 )
                 .arg(
-                    Arg::with_name("info")
-                        .short("i")
-                        .long("info")
-                        .value_name("INFO_FILE")
-                        .takes_value(true)
-                        .help("Load course info from specified file."),
-                )
-                .arg(
                     Arg::with_name("output")
                         .short("o")
                         .long("output")
@@ -148,22 +160,19 @@ fn main() {
         None => Auth::with_username_password(username.unwrap(), password.unwrap()),
     };
     let parser = UdemyParser::new();
-    let mut udemy_downloader =
-        UdemyDownloader::new(url, &client, &parser, &udemy_helper, auth).unwrap();
 
-    let result: Result<(), Error> = match matches.subcommand() {
-        ("info", Some(sub_m)) => {
+    let command: Option<Box<Command>> = match matches.subcommand() {
+        ("info", Some(_)) => {
             if verbose {
                 println!(
                     "Request information from {}",
                     matches.value_of("url").unwrap()
                 );
             }
-            let wanted_save = sub_m.value_of("save");
 
-            udemy_downloader
-                .authenticate()
-                .and(udemy_downloader.info(verbose, wanted_save))
+            let mut info = Info::new();
+            info.set_params(&InfoParams { verbose });
+            Some(Box::new(info))
         }
         ("download", Some(sub_m)) => {
             // println!("Downloading from {}", matches.value_of("url").unwrap());
@@ -178,21 +187,58 @@ fn main() {
                 .and_then(|v| v.parse::<u64>().ok());
             let dry_run = sub_m.is_present("dry-run");
             let output = sub_m.value_of("output").unwrap();
-            let wanted_info = sub_m.value_of("info");
 
-            udemy_downloader
-                .authenticate()
-                .and(udemy_downloader.download(
-                    wanted_chapter,
-                    wanted_lecture,
-                    wanted_quality,
-                    wanted_info,
-                    output,
-                    dry_run,
-                    verbose,
-                ))
+            let mut download = Download::new();
+            download.set_params(&DownloadParams {
+                wanted_chapter,
+                wanted_lecture,
+                wanted_quality,
+                dry_run,
+                verbose,
+                output: output.into(),
+            });
+            Some(Box::new(download))
         }
-        _ => Ok(()),
+        ("complete", Some(sub_m)) => {
+            // println!("Downloading from {}", matches.value_of("url").unwrap());
+            let wanted_chapter = sub_m
+                .value_of("chapter")
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap();
+            let wanted_lecture = sub_m
+                .value_of("lecture")
+                .and_then(|v| v.parse::<u64>().ok());
+
+            let mut complete = Complete::new();
+            complete.set_params(&CompleteParams {
+                wanted_chapter,
+                wanted_lecture,
+                verbose,
+            });
+            Some(Box::new(complete))
+        }
+        _ => None,
+    };
+
+    let result: Result<(), Error> = match command {
+        Some(command) => {
+            if verbose {
+                println!(
+                    "Request information from {}",
+                    matches.value_of("url").unwrap()
+                );
+            }
+
+            let mut context =
+                CommandContext::new(url, &client, &parser, &udemy_helper, auth).unwrap();
+            let mut downloader = UdemyDownloader::new(&mut context);
+
+            downloader
+                .authenticate()
+                .and_then(|_| downloader.prepare_course_info(verbose))
+                .and_then(|_| downloader.execute(&*command))
+        }
+        None => Err(format_err!("Not a valid command")),
     };
 
     if let Err(err) = result {

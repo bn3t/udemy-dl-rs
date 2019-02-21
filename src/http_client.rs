@@ -28,6 +28,7 @@ pub trait HttpClient {
     fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
     fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error>;
+    fn post_json(&self, url: &str, json: &Value, auth: &Auth) -> Result<(), Error>;
 }
 
 impl HttpClient for UdemyHttpClient {
@@ -139,8 +140,16 @@ impl HttpClient for UdemyHttpClient {
             .form(&params)
             .send()?;
         let auth_response: AuthResponse = response.json()?;
-        // println!("access_token={}", auth_response.access_token);
         Ok(auth_response.access_token)
+    }
+
+    fn post_json(&self, url: &str, json: &Value, auth: &Auth) -> Result<(), Error> {
+        self.client
+            .post(url)
+            .headers(self.construct_headers(auth))
+            .json(json)
+            .send()?;
+        Ok(())
     }
 }
 

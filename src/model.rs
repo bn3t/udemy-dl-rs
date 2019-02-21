@@ -28,6 +28,7 @@ pub struct Asset {
 /// Lecture information.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Lecture {
+    pub id: u64,
     pub object_index: u64,
     pub title: String,
     pub asset: Asset,
@@ -53,6 +54,12 @@ pub struct AuthResponse {
     pub _class: String,
     pub id: u32,
     pub access_token: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CompleteRequest {
+    pub lecture_id: u64,
+    pub downloaded: bool,
 }
 
 #[derive(Debug)]
