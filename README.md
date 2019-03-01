@@ -14,7 +14,7 @@ A cross-platform utility written in Rust to download courses from udemy for pers
 - Automatically pickup the best resolution for video download.
 - Download lecture(s) requested resolution (option: `-q / --quality`).
 - Download course to user requested path (option: `-o / --output`).
-- Mark complte chapters or individual lectures as complete. 
+- Mark complete chapters or individual lectures as complete. 
 - Authentication token (option: `-t / --access-token`).
 
 ## Authentication Details
@@ -33,6 +33,10 @@ You can either connect and authenticate with your username / password or use an 
 ### Obtain information from a course
 
     udemy-dl-rs -u COURSE_URL -t YourAccessToken info
+
+### Obtain information from a course - lohin with username / password
+
+    udemy-dl-rs -u COURSE_URL -U YourEmail -p YourPassword info
 
 ### Download a course to current diretory
 
@@ -181,4 +185,3 @@ Run unit tests with watch
 ## Alternative login / password access
 
     cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -U Email -p YourPassword  download -c 1 -o ~/Downloads
-
