@@ -53,7 +53,7 @@ pub fn json_get_string<'a, 'b>(value: &'a Value, key: &'b str) -> Result<&'a str
         .ok_or_else(|| format_err!("Error parsing json ({})", key))
 }
 
-pub fn json_get_u64<'a, 'b>(value: &Value, key: &str) -> Result<u64, Error> {
+pub fn json_get_u64(value: &Value, key: &str) -> Result<u64, Error> {
     value
         .get(key)
         .ok_or_else(|| format_err!("Error parsing json ({})", key))?
