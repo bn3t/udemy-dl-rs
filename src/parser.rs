@@ -2,10 +2,12 @@ use failure::{format_err, Error};
 use serde_json::Value;
 
 use crate::model::*;
+use crate::utils::{json_get_string, json_get_u64};
 
 pub trait Parser {
     fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error>;
     fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error>;
+    fn parse_lecture_detail(&self, lecture_detail: &Value) -> Result<LectureDetail, Error>;
 }
 
 pub struct UdemyParser {}
@@ -33,23 +35,9 @@ impl UdemyParser {
 
     /// Parse json from a specific asset.
     fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
-        let filename: String = asset
-            .get("filename")
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .as_str()
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .into();
-        let asset_type: String = asset
-            .get("asset_type")
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .as_str()
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .into();
-        let time_estimation: u64 = asset
-            .get("time_estimation")
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .as_u64()
-            .ok_or_else(|| format_err!("Error parsing json"))?;
+        let title: String = json_get_string(asset, "title")?.into();
+        let asset_type: String = json_get_string(asset, "asset_type")?.into();
+        let time_estimation: u64 = json_get_u64(asset, "time_estimation")?;
         let download_urls = asset
             .get("download_urls")
             .ok_or_else(|| format_err!("Error parsing json"))?;
@@ -68,7 +56,7 @@ impl UdemyParser {
             None
         };
         Ok(Asset {
-            filename,
+            title,
             asset_type,
             time_estimation,
             download_urls,
@@ -113,49 +101,24 @@ impl Parser for UdemyParser {
                     chapters.push(this_chapter);
                 }
                 current_chapter = Some(Chapter {
-                    object_index: item
-                        .get("object_index")
-                        .ok_or_else(|| format_err!("Error parsing json"))?
-                        .as_u64()
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                    title: String::from(
-                        item.get("title")
-                            .ok_or_else(|| format_err!("Error parsing json"))?
-                            .as_str()
-                            .ok_or_else(|| format_err!("Error parsing json"))?,
-                    ),
+                    object_index: json_get_u64(item, "object_index")?,
+                    title: json_get_string(item, "title")?.into(),
                     lectures: Vec::new(),
                 });
                 lectures = Vec::new();
             }
             if item.get("_class").unwrap() == "lecture" {
-                let asset = self.parse_asset(
-                    item.get("asset")
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                )?;
-                let supplementary_assets = self.parse_assets(
-                    item.get("supplementary_assets")
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                )?;
+                let asset = item
+                    .get("asset")
+                    .ok_or_else(|| format_err!("Error parsing json (asset)"))?;
+                let filename = json_get_string(asset, "title")?.into();
+                let has_video = json_get_string(asset, "asset_type")? == "Video";
                 lectures.push(Lecture {
-                    id: item
-                        .get("id")
-                        .ok_or_else(|| format_err!("Error parsing json"))?
-                        .as_u64()
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                    object_index: item
-                        .get("object_index")
-                        .ok_or_else(|| format_err!("Error parsing json"))?
-                        .as_u64()
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                    title: String::from(
-                        item.get("title")
-                            .ok_or_else(|| format_err!("Error parsing json"))?
-                            .as_str()
-                            .ok_or_else(|| format_err!("Error parsing json"))?,
-                    ),
-                    asset,
-                    supplementary_assets,
+                    has_video,
+                    filename,
+                    id: json_get_u64(item, "id")?,
+                    object_index: json_get_u64(item, "object_index")?,
+                    title: json_get_string(item, "title")?.into(),
                 });
             }
         }
@@ -166,18 +129,46 @@ impl Parser for UdemyParser {
         }
         Ok(CourseContent { chapters })
     }
+
+    fn parse_lecture_detail(&self, item: &Value) -> Result<LectureDetail, Error> {
+        let asset = self.parse_asset(
+            item.get("asset")
+                .ok_or_else(|| format_err!("Error parsing json (assets)"))?,
+        )?;
+        Ok(LectureDetail {
+            id: json_get_u64(item, "id")?,
+            title: json_get_string(item, "title")?.into(),
+            asset,
+        })
+    }
 }
 
 #[cfg(test)]
 mod test_udemy_downloader {
     use serde_json::Value;
+    use std::fs;
 
     use super::*;
-    use crate::test_data::*;
+
+    #[test]
+    fn parse_lecture_detail() {
+        let lecture_detail =
+            fs::read_to_string("test-data/subscribed-courses-lecture.json").unwrap();
+        let lecture_detail = serde_json::from_str(lecture_detail.as_str()).unwrap();
+
+        let parser = UdemyParser::new();
+
+        let actual = parser.parse_lecture_detail(&lecture_detail);
+
+        println!("{:?}", actual);
+
+        assert_eq!(actual.is_ok(), true);
+    }
 
     #[test]
     fn parse_subscribed_courses() {
-        let subscribed_courses: Value = serde_json::from_str(TEST_SUBSCRIBED_COURSES).unwrap();
+        let subscribed_courses = fs::read_to_string("test-data/subscribed-courses.json").unwrap();
+        let subscribed_courses: Value = serde_json::from_str(subscribed_courses.as_str()).unwrap();
 
         let parser = UdemyParser::new();
 
@@ -196,7 +187,8 @@ mod test_udemy_downloader {
 
     #[test]
     fn parse_course_content() {
-        let full_course: Value = serde_json::from_str(TEST_FULL_COURSE).unwrap();
+        let full_course = fs::read_to_string("test-data/subscriber-curriculum-items.json").unwrap();
+        let full_course: Value = serde_json::from_str(full_course.as_str()).unwrap();
 
         let parser = UdemyParser::new();
 
@@ -204,34 +196,29 @@ mod test_udemy_downloader {
 
         assert_eq!(actual.is_ok(), true);
         let course_content = actual.unwrap();
-        assert_eq!(course_content.chapters.len(), 2);
+        assert_eq!(course_content.chapters.len(), 31);
 
         assert_eq!(course_content.chapters[0].object_index, 1);
         assert_eq!(course_content.chapters[0].title, "Getting Started");
-        assert_eq!(
-            course_content.chapters[1].title,
-            "Diving Into the Basics of CSS"
-        );
+        assert_eq!(course_content.chapters[1].title, "Angular Refresher");
 
-        assert_eq!(course_content.chapters[0].lectures.len(), 2);
+        assert_eq!(course_content.chapters[0].lectures.len(), 12);
         assert_eq!(course_content.chapters[0].lectures[0].object_index, 1);
-        assert_eq!(course_content.chapters[0].lectures[0].title, "Introduction");
-        assert_eq!(course_content.chapters[0].lectures[1].title, "What is CSS?");
         assert_eq!(
-            course_content.chapters[0].lectures[1]
-                .supplementary_assets
-                .len(),
-            1
+            course_content.chapters[0].lectures[0].title,
+            "Course Introduction"
         );
         assert_eq!(
-            course_content.chapters[0].lectures[1].supplementary_assets[0].asset_type,
-            "File"
+            course_content.chapters[0].lectures[1].title,
+            "What Is Ionic?"
         );
+        assert_eq!(course_content.chapters[4].lectures[3].has_video, false);
     }
 
     #[test]
     fn parse_asset() {
-        let asset: Value = serde_json::from_str(TEST_ASSET).unwrap();
+        let asset = fs::read_to_string("test-data/asset.json").unwrap();
+        let asset: Value = serde_json::from_str(asset.as_str()).unwrap();
 
         let parser = UdemyParser::new();
 
@@ -239,9 +226,9 @@ mod test_udemy_downloader {
 
         assert_eq!(actual.is_ok(), true);
         let asset = actual.unwrap();
-        assert_eq!(asset.filename, "getting-started-01-welcome.mp4");
+        // assert_eq!(asset.filename, "getting-started-01-welcome.mp4");
         assert_eq!(asset.asset_type, "Video");
-        assert_eq!(asset.time_estimation, 99);
+        assert_eq!(asset.time_estimation, 753);
         assert_eq!(asset.download_urls.is_some(), true);
         assert_eq!(asset.download_urls.as_ref().unwrap().len(), 4);
         assert_eq!(
@@ -255,7 +242,7 @@ mod test_udemy_downloader {
                 .unwrap(),
             "video/mp4"
         );
-        assert_eq!(asset.download_urls.as_ref().unwrap()[0].file, "https://udemy-assets-on-demand2.udemy.com/2018-03-16_18-03-45-cb7a7f9f7ce092310d2ba43b50b0d2b8/WebHD_720p.mp4?nva=20190204223948&filename=getting-started-01-welcome.mp4&download=True&token=068ae457bbe97231de938");
+        assert_eq!(asset.download_urls.as_ref().unwrap()[0].file, "https://udemy-assets-on-demand2.udemy.com/2019-02-19_17-49-23-1eacdfac67e2b9a4b011e02bbf95cb80/WebHD_720p.mp4?nva=20190301211904&download=True&filename=native-app-03-creating-an-android-app.mp4&token=0954657f324d1c9cc3818");
         assert_eq!(asset.download_urls.as_ref().unwrap()[0].label, "720");
         assert_eq!(asset.download_urls.as_ref().unwrap()[1].label, "480");
         assert_eq!(asset.download_urls.as_ref().unwrap()[2].label, "360");
@@ -263,7 +250,8 @@ mod test_udemy_downloader {
     }
     #[test]
     fn parse_assets() {
-        let assets: Value = serde_json::from_str(TEST_SUP_ASSETS).unwrap();
+        let assets = fs::read_to_string("test-data/assets.json").unwrap();
+        let assets: Value = serde_json::from_str(assets.as_str()).unwrap();
 
         let parser = UdemyParser::new();
 

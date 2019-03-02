@@ -157,10 +157,10 @@ impl Download {
             chapter
                 .lectures
                 .iter()
-                .filter(|lecture| lecture.asset.asset_type == "Video")
                 .filter(|lecture| {
                     wanted_lecture.is_none() || wanted_lecture.unwrap() == lecture.object_index
                 })
+                .filter(|lecture| lecture.has_video)
                 .for_each(move |lecture| {
                     match self.download_lecture(
                         context,
@@ -197,7 +197,15 @@ impl Download {
             .udemy_helper
             .calculate_target_filename(path, &lecture)
             .unwrap();
-        if let Some(download_urls) = &lecture.asset.download_urls {
+        let url = format!(
+            "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses/{course_id}/lectures/{lecture_id}?fields[asset]=@min,download_urls,external_url,slide_urls,status,captions,thumbnail_url,time_estimation,stream_urls&fields[caption]=@default,is_translation&fields[course]=id,url,locale&fields[lecture]=@default,course,can_give_cc_feedback,download_url",
+            portal_name = context.portal_name,
+            course_id = context.course.as_ref().unwrap().id, lecture_id=lecture.id
+        );
+
+        let lecture_detail = context.client.get_as_json(url.as_str(), &context.auth)?;
+        let lecture_detail = context.parser.parse_lecture_detail(&lecture_detail)?;
+        if let Some(download_urls) = &lecture_detail.asset.download_urls {
             let best_quality = self.determine_quality(&download_urls, wanted_quality)?;
             for url in download_urls {
                 if let Some(video_type) = &url.r#type {
@@ -305,7 +313,6 @@ mod test {
         let result = download.execute(&context);
 
         assert!(result.is_ok());
-
         unsafe {
             if let Some(ref gcl) = GETS_CONTENT_LENGTH_URL {
                 assert_eq!(gcl.len(), 1);

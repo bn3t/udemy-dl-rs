@@ -14,6 +14,7 @@ A cross-platform utility written in Rust to download courses from udemy for pers
 - Automatically pickup the best resolution for video download.
 - Download lecture(s) requested resolution (option: `-q / --quality`).
 - Download course to user requested path (option: `-o / --output`).
+- Mark complete chapters or individual lectures as complete. 
 - Authentication token (option: `-t / --access-token`).
 
 ## Authentication Details
@@ -32,6 +33,10 @@ You can either connect and authenticate with your username / password or use an 
 ### Obtain information from a course
 
     udemy-dl-rs -u COURSE_URL -t YourAccessToken info
+
+### Obtain information from a course - lohin with username / password
+
+    udemy-dl-rs -u COURSE_URL -U YourEmail -p YourPassword info
 
 ### Download a course to current diretory
 
@@ -61,7 +66,7 @@ Note: The lecture number is it's index in the overall course. Use info to know m
 
 ```
 $ udemy-dl-rs
-Udemy Downloader 0.1.0
+Udemy Downloader 0.9.2
 Bernard Niset
 
 
@@ -80,27 +85,27 @@ OPTIONS:
     -U, --username <USERNAME>     Username to authenticate to udemy
 
 SUBCOMMANDS:
+    complete    Mark courses as completed
     download    Download course content
     help        Prints this message or the help of the given subcommand(s)
     info        Query course information
+
+Build: unknown - 2019-02-21
 ```
 
 ### Subcommand Usage - info
 
 ```
 $ udemy-dl-rs info --help
-udemy-dl-rs-info
+udemy-dl-rs-info 
 Query course information
 
 USAGE:
-    udemy-dl-rs --password <PASSWORD> --url <URL> --username <USERNAME> info [OPTIONS]
+    udemy-dl-rs --password <PASSWORD> --url <URL> --username <USERNAME> info
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
-
-OPTIONS:
-    -s, --save <save>    Saves info.json to a file
 ```
 
 
@@ -108,7 +113,7 @@ OPTIONS:
 
 ```
 $ udemy-dl-rs download --help
-udemy-dl-rs-download
+udemy-dl-rs-download 
 Download course content
 
 USAGE:
@@ -121,13 +126,29 @@ FLAGS:
 
 OPTIONS:
     -c, --chapter <CHAPTER>      Restrict downloads to a specific chapter.
-    -i, --info <INFO_FILE>       Load course info from specified file.
     -l, --lecture <LECTURE>      Restrict download to a specific lecture.
     -o, --output <OUTPUT_DIR>    Directory where to output downloaded files (default to .). [default: .]
     -q, --quality <QUALITY>      Download specific video quality.
 ```
 
+### Subcommand Usage - complete
 
+```
+$ udemy-dl-rs complte --help
+udemy-dl-rs-complete 
+Mark courses as completed
+
+USAGE:
+    udemy-dl-rs --password <PASSWORD> --url <URL> --username <USERNAME> complete [OPTIONS] --chapter <CHAPTER>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -c, --chapter <CHAPTER>    Restrict marking a specific chapter.
+    -l, --lecture <LECTURE>    Restrict marking a specific lecture.
+```
 
 ## To do
 
@@ -164,4 +185,3 @@ Run unit tests with watch
 ## Alternative login / password access
 
     cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -U Email -p YourPassword  download -c 1 -o ~/Downloads
-

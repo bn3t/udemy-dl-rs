@@ -43,9 +43,7 @@ impl<'a> UdemyHelper<'a> {
         lecture: &Lecture,
     ) -> Result<String, Error> {
         let mut path_buf = PathBuf::from(target_dir);
-        let extension = Path::new(lecture.asset.filename.as_str())
-            .extension()
-            .unwrap();
+        let extension = Path::new(lecture.filename.as_str()).extension().unwrap();
         path_buf.push(format!(
             "{:03} {}.{}",
             lecture.object_index,
@@ -97,20 +95,11 @@ mod test_udemy_helper {
     #[test]
     fn calculate_target_file() {
         let lecture = Lecture {
+            has_video: true,
+            filename: "blah-blah.mp4".into(),
             id: 4321,
             object_index: 32,
             title: "The Lecture".into(),
-            asset: Asset {
-                filename: "blah-blah.mp4".into(),
-                asset_type: "Video".into(),
-                time_estimation: 234,
-                download_urls: Some(vec![DownloadUrl {
-                    r#type: Some("video/mp4".into()),
-                    file: "http://the-host/thefile.mp4".into(),
-                    label: "720".into(),
-                }]),
-            },
-            supplementary_assets: vec![],
         };
 
         let fs_helper = MockFsHelper {};
@@ -119,7 +108,6 @@ mod test_udemy_helper {
         let actual = udemy_helper.calculate_target_filename("./", &lecture);
 
         assert!(actual.is_ok());
-        assert_eq!(actual.unwrap(), "./032 The Lecture.mp4");
     }
 
 }
