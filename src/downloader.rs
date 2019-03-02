@@ -48,7 +48,7 @@ impl<'a> UdemyDownloader<'a> {
     }
 
     fn get_info(&self, course: &Course, verbose: bool) -> Result<String, Error> {
-        let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000",
+        let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/subscriber-curriculum-items/?page_size=1400&fields[lecture]=@min,object_index,asset,supplementary_assets,sort_order,is_published,is_free&fields[quiz]=@min,object_index,title,sort_order,is_published&fields[practice]=@min,object_index,title,sort_order,is_published&fields[chapter]=@min,description,object_index,title,sort_order,is_published&fields[asset]=@min,title,filename,asset_type,external_url,length,status",
         portal_name = self.command_context.portal_name, course_id=course.id);
 
         if verbose {

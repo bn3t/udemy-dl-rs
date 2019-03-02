@@ -113,22 +113,29 @@ impl Parser for MockParser {
                 object_index: 1,
                 title: "The Chapter".into(),
                 lectures: vec![Lecture {
+                    has_video: true,
+                    filename: "blah-blah.mp4".into(),
                     id: 4321,
                     object_index: 1,
                     title: "The Lecture".into(),
-                    asset: Asset {
-                        filename: "the-filename.mp4".into(),
-                        asset_type: "Video".into(),
-                        time_estimation: 321,
-                        download_urls: Some(vec![DownloadUrl {
-                            r#type: Some("video/mp4".into()),
-                            file: "http://host-name/the-filename.mp4".into(),
-                            label: "720".into(),
-                        }]),
-                    },
-                    supplementary_assets: vec![],
                 }],
             }],
+        })
+    }
+    fn parse_lecture_detail(&self, _lecture_detail: &Value) -> Result<LectureDetail, Error> {
+        Ok(LectureDetail {
+            id: 4321,
+            title: "The lecture title".into(),
+            asset: Asset {
+                title: "native-app-03-creating-an-android-app.mp4".into(),
+                asset_type: "Video".into(),
+                time_estimation: 2222,
+                download_urls: Some(vec![DownloadUrl {
+                    r#type: Some("video/mp4".into()),
+                    label: "720".into(),
+                    file: "http://host-name/the-filename.mp4".into(),
+                }]),
+            },
         })
     }
 }
