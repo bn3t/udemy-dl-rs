@@ -19,20 +19,28 @@ pub struct DownloadUrl {
 /// Asset information, either for video or supplementary asset.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Asset {
-    pub filename: String,
+    pub title: String,
     pub asset_type: String,
     pub time_estimation: u64,
     pub download_urls: Option<Vec<DownloadUrl>>,
 }
 
-/// Lecture information.
+/// Lecture information. Coming from lecture detail.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LectureDetail {
+    pub id: u64,
+    pub title: String,
+    pub asset: Asset,
+}
+
+/// Lecture information. Coming from genaral course information.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Lecture {
     pub id: u64,
     pub object_index: u64,
     pub title: String,
-    pub asset: Asset,
-    pub supplementary_assets: Vec<Asset>,
+    pub filename: String,
+    pub has_video: bool,
 }
 
 /// Chapter information.

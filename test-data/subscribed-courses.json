@@ -1,0 +1,26 @@
+{
+    "count": 13,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "_class": "course",
+            "id": 1561458,
+            "url": "/css-the-complete-guide-incl-flexbox-grid-sass/learn/v4/",
+            "published_title": "css-the-complete-guide-incl-flexbox-grid-sass"
+        },
+        {
+            "_class": "course",
+            "id": 995016,
+            "url": "/vuejs-2-the-complete-guide/learn/v4/",
+            "published_title": "vuejs-2-the-complete-guide"
+        },
+        {
+            "_class": "course",
+            "id": 1362070,
+            "url": "/react-the-complete-guide-incl-redux/learn/v4/",
+            "published_title": "react-the-complete-guide-incl-redux"
+        }
+    ],
+    "aggregations": null
+}

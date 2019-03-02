@@ -1,4 +1,5 @@
-use failure::Error;
+use failure::{format_err, Error};
+use serde_json::Value;
 use std::fs;
 
 /// Returns a cross-platform-filename-safe version of any string.
@@ -42,6 +43,14 @@ pub fn save_to_file(filename: &str, content: &str) -> Result<(), Error> {
 
 pub fn load_from_file(filename: &str) -> Result<String, Error> {
     Ok(fs::read_to_string(filename)?)
+}
+
+pub fn json_get_string<'a, 'b>(value: &'a Value, key: &'b str) -> Result<&'a str, Error> {
+    value
+        .get(key)
+        .ok_or_else(|| format_err!("Error parsing json ({})", key))?
+        .as_str()
+        .ok_or_else(|| format_err!("Error parsing json ({})", key))
 }
 
 #[cfg(test)]
