@@ -2,7 +2,7 @@ use failure::{format_err, Error};
 use serde_json::Value;
 
 use crate::model::*;
-use crate::utils::json_get_string;
+use crate::utils::{json_get_string, json_get_u64};
 
 pub trait Parser {
     fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error>;
@@ -35,23 +35,9 @@ impl UdemyParser {
 
     /// Parse json from a specific asset.
     fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
-        let title: String = asset
-            .get("title")
-            .ok_or_else(|| format_err!("Error parsing json (title)"))?
-            .as_str()
-            .ok_or_else(|| format_err!("Error parsing json (title)"))?
-            .into();
-        let asset_type: String = asset
-            .get("asset_type")
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .as_str()
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .into();
-        let time_estimation: u64 = asset
-            .get("time_estimation")
-            .ok_or_else(|| format_err!("Error parsing json"))?
-            .as_u64()
-            .ok_or_else(|| format_err!("Error parsing json"))?;
+        let title: String = json_get_string(asset, "title")?.into();
+        let asset_type: String = json_get_string(asset, "asset_type")?.into();
+        let time_estimation: u64 = json_get_u64(asset, "time_estimation")?;
         let download_urls = asset
             .get("download_urls")
             .ok_or_else(|| format_err!("Error parsing json"))?;
@@ -115,17 +101,8 @@ impl Parser for UdemyParser {
                     chapters.push(this_chapter);
                 }
                 current_chapter = Some(Chapter {
-                    object_index: item
-                        .get("object_index")
-                        .ok_or_else(|| format_err!("Error parsing json"))?
-                        .as_u64()
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                    title: String::from(
-                        item.get("title")
-                            .ok_or_else(|| format_err!("Error parsing json"))?
-                            .as_str()
-                            .ok_or_else(|| format_err!("Error parsing json"))?,
-                    ),
+                    object_index: json_get_u64(item, "object_index")?,
+                    title: json_get_string(item, "title")?.into(),
                     lectures: Vec::new(),
                 });
                 lectures = Vec::new();
@@ -134,26 +111,14 @@ impl Parser for UdemyParser {
                 let asset = item
                     .get("asset")
                     .ok_or_else(|| format_err!("Error parsing json (asset)"))?;
-                let filename = asset
-                    .get("title")
-                    .ok_or_else(|| format_err!("Error parsing json (filename)"))?
-                    .as_str()
-                    .ok_or_else(|| format_err!("Error parsing json (filename)"))?;
+                let filename = json_get_string(asset, "title")?.into();
                 let has_video = json_get_string(asset, "asset_type")? == "Video";
                 lectures.push(Lecture {
                     has_video,
-                    filename: String::from(filename),
-                    id: item
-                        .get("id")
-                        .ok_or_else(|| format_err!("Error parsing json"))?
-                        .as_u64()
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                    object_index: item
-                        .get("object_index")
-                        .ok_or_else(|| format_err!("Error parsing json"))?
-                        .as_u64()
-                        .ok_or_else(|| format_err!("Error parsing json"))?,
-                    title: String::from(json_get_string(item, "title")?),
+                    filename,
+                    id: json_get_u64(item, "id")?,
+                    object_index: json_get_u64(item, "object_index")?,
+                    title: json_get_string(item, "title")?.into(),
                 });
             }
         }
@@ -171,17 +136,8 @@ impl Parser for UdemyParser {
                 .ok_or_else(|| format_err!("Error parsing json (assets)"))?,
         )?;
         Ok(LectureDetail {
-            id: item
-                .get("id")
-                .ok_or_else(|| format_err!("Error parsing json (id)"))?
-                .as_u64()
-                .ok_or_else(|| format_err!("Error parsing json (id)"))?,
-            title: String::from(
-                item.get("title")
-                    .ok_or_else(|| format_err!("Error parsing json (title)"))?
-                    .as_str()
-                    .ok_or_else(|| format_err!("Error parsing json (title)"))?,
-            ),
+            id: json_get_u64(item, "id")?,
+            title: json_get_string(item, "title")?.into(),
             asset,
         })
     }
