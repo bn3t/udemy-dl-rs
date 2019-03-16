@@ -13,9 +13,9 @@ use crate::model::*;
 use crate::utils::*;
 
 pub struct DownloadParams {
-    pub wanted_chapter: Option<u64>,
-    pub wanted_lecture: Option<u64>,
-    pub wanted_quality: Option<u64>,
+    pub wanted_chapter: Option<ObjectIndex>,
+    pub wanted_lecture: Option<LectureId>,
+    pub wanted_quality: Option<VideoQuality>,
     pub output: String,
     pub dry_run: bool,
     pub verbose: bool,
@@ -106,21 +106,21 @@ impl Download {
     fn determine_quality(
         &self,
         download_urls: &[DownloadUrl],
-        wanted_quality: Option<u64>,
+        wanted_quality: Option<VideoQuality>,
     ) -> Result<String, Error> {
         let quality = match wanted_quality {
             Some(quality) => download_urls
                 .iter()
                 .filter(|url| url.r#type == Some("video/mp4".into()))
                 .map(|url| &url.label)
-                .filter_map(|label| label.parse::<u64>().ok())
+                .filter_map(|label| label.parse::<VideoQuality>().ok())
                 .filter(|label| *label >= quality)
                 .min(),
             None => download_urls
                 .iter()
                 .filter(|url| url.r#type == Some("video/mp4".into()))
                 .map(|url| &url.label)
-                .filter_map(|label| label.parse::<u64>().ok())
+                .filter_map(|label| label.parse::<VideoQuality>().ok())
                 .max(),
         };
         let quality = quality
@@ -133,8 +133,8 @@ impl Download {
         &self,
         context: &CommandContext,
         chapter: &Chapter,
-        wanted_lecture: Option<u64>,
-        wanted_quality: Option<u64>,
+        wanted_lecture: Option<LectureId>,
+        wanted_quality: Option<VideoQuality>,
         output: &str,
         dry_run: bool,
         verbose: bool,
@@ -188,7 +188,7 @@ impl Download {
         &self,
         context: &CommandContext,
         lecture: &Lecture,
-        wanted_quality: Option<u64>,
+        wanted_quality: Option<VideoQuality>,
         path: &str,
         dry_run: bool,
         verbose: bool,
@@ -232,9 +232,9 @@ impl Download {
     pub fn download(
         &self,
         context: &CommandContext,
-        wanted_chapter: Option<u64>,
-        wanted_lecture: Option<u64>,
-        wanted_quality: Option<u64>,
+        wanted_chapter: Option<ObjectIndex>,
+        wanted_lecture: Option<LectureId>,
+        wanted_quality: Option<VideoQuality>,
         output: &str,
         dry_run: bool,
         verbose: bool,
@@ -268,8 +268,8 @@ impl Download {
 mod test {
     use super::*;
 
-    use crate::mocks::*;
-    use crate::test_data::*;
+    use crate::mocks::test::*;
+    use crate::test_data::test::*;
     use crate::udemy_helper::UdemyHelper;
 
     #[test]

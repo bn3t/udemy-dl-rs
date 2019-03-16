@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use clap::{App, AppSettings, Arg, SubCommand};
 
 use failure::{format_err, Error};
@@ -25,7 +23,7 @@ use downloader::UdemyDownloader;
 use fs_helper::UdemyFsHelper;
 use http_client::UdemyHttpClient;
 use info::*;
-use model::Auth;
+use model::{Auth, LectureId, ObjectIndex, VideoQuality};
 use parser::UdemyParser;
 use udemy_helper::UdemyHelper;
 
@@ -178,13 +176,13 @@ fn main() {
             // println!("Downloading from {}", matches.value_of("url").unwrap());
             let wanted_chapter = sub_m
                 .value_of("chapter")
-                .and_then(|v| v.parse::<u64>().ok());
+                .and_then(|v| v.parse::<ObjectIndex>().ok());
             let wanted_lecture = sub_m
                 .value_of("lecture")
-                .and_then(|v| v.parse::<u64>().ok());
+                .and_then(|v| v.parse::<LectureId>().ok());
             let wanted_quality = sub_m
                 .value_of("quality")
-                .and_then(|v| v.parse::<u64>().ok());
+                .and_then(|v| v.parse::<VideoQuality>().ok());
             let dry_run = sub_m.is_present("dry-run");
             let output = sub_m.value_of("output").unwrap();
 
@@ -203,11 +201,11 @@ fn main() {
             // println!("Downloading from {}", matches.value_of("url").unwrap());
             let wanted_chapter = sub_m
                 .value_of("chapter")
-                .and_then(|v| v.parse::<u64>().ok())
+                .and_then(|v| v.parse::<ObjectIndex>().ok())
                 .unwrap();
             let wanted_lecture = sub_m
                 .value_of("lecture")
-                .and_then(|v| v.parse::<u64>().ok());
+                .and_then(|v| v.parse::<LectureId>().ok());
 
             let mut complete = Complete::new();
             complete.set_params(&CompleteParams {
