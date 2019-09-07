@@ -43,7 +43,7 @@ pub mod test {
             };
             Ok(321)
         }
-        fn get_as_data(&self, url: &str, _f: &mut FnMut(u64)) -> Result<Vec<u8>, Error> {
+        fn get_as_data(&self, url: &str, _f: &mut dyn FnMut(u64)) -> Result<Vec<u8>, Error> {
             println!("get_as_data url={}", url);
             unsafe {
                 match GETS_AS_DATA_URL {

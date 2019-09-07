@@ -25,7 +25,7 @@ pub trait HttpClient {
                 .map_err(|e| format_err!("Error parsing json from url <{}>: {:?}", url, e))
         })?
     }
-    fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error>;
+    fn get_as_data(&self, url: &str, f: &mut dyn FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
     fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error>;
     fn post_json(&self, url: &str, json: &Value, auth: &Auth) -> Result<(), Error>;
@@ -68,7 +68,7 @@ impl HttpClient for UdemyHttpClient {
         }
     }
 
-    fn get_as_data(&self, url: &str, f: &mut FnMut(u64)) -> Result<Vec<u8>, Error> {
+    fn get_as_data(&self, url: &str, f: &mut dyn FnMut(u64)) -> Result<Vec<u8>, Error> {
         let http_range = self.has_http_range(url)?;
         if http_range {
             let total = self.get_content_length(url)?;

@@ -159,7 +159,7 @@ fn main() {
     };
     let parser = UdemyParser::new();
 
-    let command: Option<Box<Command>> = match matches.subcommand() {
+    let command: Option<Box<dyn Command>> = match matches.subcommand() {
         ("info", Some(_)) => {
             if verbose {
                 println!(

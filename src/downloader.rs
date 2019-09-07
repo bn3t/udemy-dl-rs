@@ -72,7 +72,7 @@ impl<'a> UdemyDownloader<'a> {
         Ok(())
     }
 
-    pub fn execute(&self, command: &Command) -> Result<(), Error> {
+    pub fn execute(&self, command: &dyn Command) -> Result<(), Error> {
         command.execute(&self.command_context)
     }
 
