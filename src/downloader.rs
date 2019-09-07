@@ -3,9 +3,6 @@ use failure::{format_err, Error};
 use crate::command::*;
 use crate::model::*;
 
-const LOGIN_URL: &str =
-    "https://www.udemy.com/api-2.0/auth/udemy-auth/login/?fields[user]=access_token";
-
 pub struct UdemyDownloader<'a> {
     command_context: &'a mut CommandContext<'a>,
 }
@@ -62,13 +59,7 @@ impl<'a> UdemyDownloader<'a> {
     }
 
     pub fn authenticate(&mut self) -> Result<(), Error> {
-        if self.command_context.auth.access_token.is_none() {
-            let access_token = self
-                .command_context
-                .client
-                .post_login_form(LOGIN_URL, &self.command_context.auth)?;
-            self.command_context.auth.access_token = Some(access_token);
-        }
+        // Previously, authentication with login form was supported
         Ok(())
     }
 

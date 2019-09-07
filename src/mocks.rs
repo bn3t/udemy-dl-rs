@@ -55,9 +55,6 @@ pub mod test {
             };
             Ok(vec![])
         }
-        fn post_login_form(&self, _url: &str, _auth: &Auth) -> Result<String, Error> {
-            Ok("blah".into())
-        }
         fn post_json(&self, url: &str, json: &Value, _auth: &Auth) -> Result<(), Error> {
             unsafe {
                 match POST_JSON_DATA_BODY {

@@ -49,25 +49,7 @@ fn main() {
                 .long("access-token")
                 .value_name("TOKEN")
                 .help("Access token to authenticate to udemy")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("username")
-                .short("U")
-                .long("username")
-                .value_name("USERNAME")
-                .help("Username to authenticate to udemy")
-                .required_unless("access_token")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("password")
-                .short("p")
-                .long("password")
-                .value_name("PASSWORD")
-                .help("Password to authenticate to udemy")
-                .required_unless("access_token")
+                .required(true)
                 .takes_value(true),
         )
         .arg(
@@ -146,17 +128,12 @@ fn main() {
 
     let verbose = matches.is_present("verbose");
     let url = matches.value_of("url").unwrap();
-    let access_token = matches.value_of("access_token");
-    let username = matches.value_of("username");
-    let password = matches.value_of("password");
+    let access_token = matches.value_of("access_token").unwrap_or("INVALID");
 
     let fs_helper = UdemyFsHelper {};
     let udemy_helper = UdemyHelper::new(&fs_helper);
     let client = UdemyHttpClient::new();
-    let auth = match access_token {
-        Some(access_token) => Auth::with_token(access_token),
-        None => Auth::with_username_password(username.unwrap(), password.unwrap()),
-    };
+    let auth = Auth::with_token(access_token);
     let parser = UdemyParser::new();
 
     let command: Option<Box<dyn Command>> = match matches.subcommand() {

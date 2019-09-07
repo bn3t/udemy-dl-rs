@@ -17,7 +17,7 @@ A cross-platform utility written in Rust to download courses from udemy for pers
 
 ## Authentication Details
 
-You can either connect and authenticate with your username / password or use an _Access Token_. The following paragraph details how to obtain such a token.
+Authentication is only supported via the usage of an _Access Token_. The following paragraph details how to obtain such a token.
 
 ### Extracting your Access Token
 
@@ -31,10 +31,6 @@ You can either connect and authenticate with your username / password or use an 
 ### Obtain information from a course
 
     udemy-dl-rs -u COURSE_URL -t YourAccessToken info
-
-### Obtain information from a course - lohin with username / password
-
-    udemy-dl-rs -u COURSE_URL -U YourEmail -p YourPassword info
 
 ### Download a course to current diretory
 
@@ -63,13 +59,13 @@ Note: The lecture number is it's index in the overall course. Use info to know m
 ### General Usage
 
 ```
-$ udemy-dl-rs
-Udemy Downloader 0.9.2
+$ udemy-dl-rs --help
+Udemy Downloader 0.10.0
 Bernard Niset
 
 
 USAGE:
-    udemy-dl-rs [FLAGS] [OPTIONS] --password <PASSWORD> --url <URL> --username <USERNAME> <SUBCOMMAND>
+    udemy-dl-rs [FLAGS] --access-token <TOKEN> --url <URL> <SUBCOMMAND>
 
 FLAGS:
     -h, --help       Prints help information
@@ -78,9 +74,7 @@ FLAGS:
 
 OPTIONS:
     -t, --access-token <TOKEN>    Access token to authenticate to udemy
-    -p, --password <PASSWORD>     Password to authenticate to udemy
     -u, --url <URL>               URL of the course to download
-    -U, --username <USERNAME>     Username to authenticate to udemy
 
 SUBCOMMANDS:
     complete    Mark courses as completed
@@ -88,7 +82,7 @@ SUBCOMMANDS:
     help        Prints this message or the help of the given subcommand(s)
     info        Query course information
 
-Build: unknown - 2019-02-21
+Build: 814815c - 2019-09-07
 ```
 
 ### Subcommand Usage - info
@@ -179,6 +173,6 @@ Run unit tests with watch
 
     cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken -c YourClientId download -c 1
 
-## Alternative login / password access
+## Run download command to a location ~/Downloads
 
-    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -U Email -p YourPassword  download -c 1 -o ~/Downloads
+    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken download -c 1 -o ~/Downloads

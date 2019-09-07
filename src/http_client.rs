@@ -1,14 +1,12 @@
-use std::collections::HashMap;
-
 use failure::{format_err, Error};
 use reqwest::header::{
-    HeaderMap, HeaderName, HeaderValue, ACCEPT_RANGES, AUTHORIZATION, HOST, RANGE, USER_AGENT,
+    HeaderMap, HeaderName, HeaderValue, ACCEPT_RANGES, AUTHORIZATION, RANGE, USER_AGENT,
 };
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{from_str, Value};
 
-use crate::model::{Auth, AuthResponse};
+use crate::model::Auth;
 
 const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.21 (KHTML, like Gecko) Mwendo/1.1.5 Safari/537.21";
 const CHUNK: u64 = 2 * 1024 * 1024;
@@ -27,7 +25,6 @@ pub trait HttpClient {
     }
     fn get_as_data(&self, url: &str, f: &mut dyn FnMut(u64)) -> Result<Vec<u8>, Error>;
     fn get_content_length(&self, url: &str) -> Result<u64, Error>;
-    fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error>;
     fn post_json(&self, url: &str, json: &Value, auth: &Auth) -> Result<(), Error>;
 }
 
@@ -114,33 +111,6 @@ impl HttpClient for UdemyHttpClient {
                 Err(format_err!("Error while getting from url <{}>", url))
             }
         }
-    }
-
-    fn post_login_form(&self, url: &str, auth: &Auth) -> Result<String, Error> {
-        let mut headers = HeaderMap::new();
-
-        headers.insert(HOST, "www.udemy.com".parse().unwrap());
-        headers.insert(AUTHORIZATION, "Basic YWQxMmVjYTljYmUxN2FmYWM2MjU5ZmU1ZDk4NDcxYTY6YTdjNjMwNjQ2MzA4ODI0YjIzMDFmZGI2MGVjZmQ4YTA5NDdlODJkNQ==".parse().unwrap());
-        headers.insert(USER_AGENT, DEFAULT_UA.parse().unwrap());
-
-        let mut params = HashMap::new();
-        params.insert(
-            "email",
-            auth.username_password.as_ref().unwrap().username.as_str(),
-        );
-        params.insert(
-            "password",
-            auth.username_password.as_ref().unwrap().password.as_str(),
-        );
-
-        let mut response = self
-            .client
-            .post(url)
-            .headers(headers)
-            .form(&params)
-            .send()?;
-        let auth_response: AuthResponse = response.json()?;
-        Ok(auth_response.access_token)
     }
 
     fn post_json(&self, url: &str, json: &Value, auth: &Auth) -> Result<(), Error> {
