@@ -18,20 +18,6 @@ impl UdemyParser {
     pub fn new() -> UdemyParser {
         UdemyParser {}
     }
-    /// Parse assets from the full course data.
-    fn parse_assets(&self, value: &Value) -> Result<Vec<Asset>, Error> {
-        let assets = value
-            .as_array()
-            .ok_or_else(|| format_err!("Error parsing json"))?;
-
-        let assets: Vec<Asset> = assets
-            .iter()
-            .map(|asset| self.parse_asset(asset))
-            .filter(|asset| asset.is_ok())
-            .map(|asset| asset.unwrap())
-            .collect();
-        Ok(assets)
-    }
 
     /// Parse json from a specific asset.
     fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
@@ -247,16 +233,5 @@ mod test_udemy_downloader {
         assert_eq!(asset.download_urls.as_ref().unwrap()[1].label, "480");
         assert_eq!(asset.download_urls.as_ref().unwrap()[2].label, "360");
         assert_eq!(asset.download_urls.as_ref().unwrap()[3].label, "144");
-    }
-    #[test]
-    fn parse_assets() {
-        let assets = fs::read_to_string("test-data/assets.json").unwrap();
-        let assets: Value = serde_json::from_str(assets.as_str()).unwrap();
-
-        let parser = UdemyParser::new();
-
-        let actual = parser.parse_assets(&assets);
-
-        assert_eq!(actual.is_ok(), true);
     }
 }

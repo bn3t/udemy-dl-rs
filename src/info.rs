@@ -51,8 +51,8 @@ mod test {
     use super::*;
 
     use crate::downloader::UdemyDownloader;
-    use crate::mocks::*;
-    use crate::test_data::*;
+    use crate::mocks::test::*;
+    use crate::test_data::test::*;
     use crate::udemy_helper::UdemyHelper;
 
     #[test]

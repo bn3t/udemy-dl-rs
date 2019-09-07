@@ -6,8 +6,8 @@ use crate::command::*;
 use crate::model::*;
 
 pub struct CompleteParams {
-    pub wanted_chapter: u64,
-    pub wanted_lecture: Option<u64>,
+    pub wanted_chapter: ObjectIndex,
+    pub wanted_lecture: Option<LectureId>,
     pub verbose: bool,
 }
 
@@ -56,7 +56,7 @@ impl Complete {
         &self,
         context: &CommandContext,
         chapter: &Chapter,
-        wanted_lecture: Option<u64>,
+        wanted_lecture: Option<ObjectIndex>,
         verbose: bool,
     ) -> Result<(), Error> {
         if verbose {
@@ -115,8 +115,8 @@ impl Complete {
     pub fn complete(
         &self,
         context: &CommandContext,
-        wanted_chapter: u64,
-        wanted_lecture: Option<u64>,
+        wanted_chapter: ObjectIndex,
+        wanted_lecture: Option<LectureId>,
         verbose: bool,
     ) -> Result<(), Error> {
         if verbose {
@@ -139,8 +139,8 @@ impl Complete {
 mod test {
     use super::*;
 
-    use crate::mocks::*;
-    use crate::test_data::*;
+    use crate::mocks::test::*;
+    use crate::test_data::test::*;
     use crate::udemy_helper::UdemyHelper;
 
     #[test]

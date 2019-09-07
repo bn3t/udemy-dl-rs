@@ -3,16 +3,9 @@ use failure::{format_err, Error};
 use crate::command::*;
 use crate::model::*;
 
-const PORTAL_NAME: &str = "www";
-const COURSE_SEARCH: &str = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,published_title&page=1&page_size=1000&ordering=-access_time&search={course_name}";
-const LOGIN_URL: &str =
-    "https://www.udemy.com/api-2.0/auth/udemy-auth/login/?fields[user]=access_token";
-
 pub struct UdemyDownloader<'a> {
     command_context: &'a mut CommandContext<'a>,
 }
-
-type CourseId = u64;
 
 impl<'a> UdemyDownloader<'a> {
     pub fn new(context: &'a mut CommandContext<'a>) -> UdemyDownloader<'a> {
@@ -66,17 +59,11 @@ impl<'a> UdemyDownloader<'a> {
     }
 
     pub fn authenticate(&mut self) -> Result<(), Error> {
-        if self.command_context.auth.access_token.is_none() {
-            let access_token = self
-                .command_context
-                .client
-                .post_login_form(LOGIN_URL, &self.command_context.auth)?;
-            self.command_context.auth.access_token = Some(access_token);
-        }
+        // Previously, authentication with login form was supported
         Ok(())
     }
 
-    pub fn execute(&self, command: &Command) -> Result<(), Error> {
+    pub fn execute(&self, command: &dyn Command) -> Result<(), Error> {
         command.execute(&self.command_context)
     }
 
@@ -96,7 +83,7 @@ impl<'a> UdemyDownloader<'a> {
 mod test_udemy_downloader {
 
     use crate::command::*;
-    use crate::mocks::*;
+    use crate::mocks::test::*;
     use crate::model::*;
     use crate::udemy_helper::UdemyHelper;
 

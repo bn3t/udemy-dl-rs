@@ -1,4 +1,3 @@
-
 # Download udemy courses in batch. [![Build Status](https://travis-ci.org/bn3t/udemy-dl-rs.svg?branch=develop)](https://travis-ci.org/bn3t/udemy-dl-rs)
 
 # Usage
@@ -7,36 +6,31 @@ A cross-platform utility written in Rust to download courses from udemy for pers
 
 ## Features
 
-- Save course information to a text file (JSON) (option: `info -s, --save <save>`).
 - List down course contents and video resolution (option: `info`).
 - Download specific chapter in a course (option: `-c / --chapter`).
 - Download specific lecture in a chapter (option: `-l / --lecture`).
 - Automatically pickup the best resolution for video download.
 - Download lecture(s) requested resolution (option: `-q / --quality`).
 - Download course to user requested path (option: `-o / --output`).
-- Mark complete chapters or individual lectures as complete. 
+- Mark complete chapters or individual lectures as complete.
 - Authentication token (option: `-t / --access-token`).
 
 ## Authentication Details
 
-You can either connect and authenticate with your username / password or use an *Access Token*. The following paragraph details how to obtain such a token.
+Authentication is only supported via the usage of an _Access Token_. The following paragraph details how to obtain such a token.
 
 ### Extracting your Access Token
 
- - Open developer tools on your browser and access the **Network Tab**.
- - Login to your udemy account.
- - Check the network tab, you can filter on XHR requests to make the following easier.
- - Right click on request links to **udemy.com/api-2.0/**. Check the request cookies and find one named *access_token*. Copy its value. This is your access token.
+- Open developer tools on your browser and access the **Network Tab**.
+- Login to your udemy account.
+- Check the network tab, you can filter on XHR requests to make the following easier.
+- Right click on request links to **udemy.com/api-2.0/**. Check the request cookies and find one named _access_token_. Copy its value. This is your access token.
 
 ## Example Usage
 
 ### Obtain information from a course
 
     udemy-dl-rs -u COURSE_URL -t YourAccessToken info
-
-### Obtain information from a course - lohin with username / password
-
-    udemy-dl-rs -u COURSE_URL -U YourEmail -p YourPassword info
 
 ### Download a course to current diretory
 
@@ -65,13 +59,13 @@ Note: The lecture number is it's index in the overall course. Use info to know m
 ### General Usage
 
 ```
-$ udemy-dl-rs
-Udemy Downloader 0.9.2
+$ udemy-dl-rs --help
+Udemy Downloader 0.10.0
 Bernard Niset
 
 
 USAGE:
-    udemy-dl-rs [FLAGS] [OPTIONS] --password <PASSWORD> --url <URL> --username <USERNAME> <SUBCOMMAND>
+    udemy-dl-rs [FLAGS] --access-token <TOKEN> --url <URL> <SUBCOMMAND>
 
 FLAGS:
     -h, --help       Prints help information
@@ -80,9 +74,7 @@ FLAGS:
 
 OPTIONS:
     -t, --access-token <TOKEN>    Access token to authenticate to udemy
-    -p, --password <PASSWORD>     Password to authenticate to udemy
     -u, --url <URL>               URL of the course to download
-    -U, --username <USERNAME>     Username to authenticate to udemy
 
 SUBCOMMANDS:
     complete    Mark courses as completed
@@ -90,14 +82,14 @@ SUBCOMMANDS:
     help        Prints this message or the help of the given subcommand(s)
     info        Query course information
 
-Build: unknown - 2019-02-21
+Build: 814815c - 2019-09-07
 ```
 
 ### Subcommand Usage - info
 
 ```
 $ udemy-dl-rs info --help
-udemy-dl-rs-info 
+udemy-dl-rs-info
 Query course information
 
 USAGE:
@@ -108,12 +100,11 @@ FLAGS:
     -V, --version    Prints version information
 ```
 
-
 ### Subcommand Usage - download
 
 ```
 $ udemy-dl-rs download --help
-udemy-dl-rs-download 
+udemy-dl-rs-download
 Download course content
 
 USAGE:
@@ -135,7 +126,7 @@ OPTIONS:
 
 ```
 $ udemy-dl-rs complte --help
-udemy-dl-rs-complete 
+udemy-dl-rs-complete
 Mark courses as completed
 
 USAGE:
@@ -182,6 +173,6 @@ Run unit tests with watch
 
     cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken -c YourClientId download -c 1
 
-## Alternative login / password access
+## Run download command to a location ~/Downloads
 
-    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -U Email -p YourPassword  download -c 1 -o ~/Downloads
+    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken download -c 1 -o ~/Downloads

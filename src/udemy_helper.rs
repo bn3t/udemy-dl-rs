@@ -8,11 +8,11 @@ use crate::model::*;
 use crate::utils::*;
 
 pub struct UdemyHelper<'a> {
-    fs_helper: &'a FsHelper,
+    fs_helper: &'a dyn FsHelper,
 }
 
 impl<'a> UdemyHelper<'a> {
-    pub fn new(fs_helper: &'a FsHelper) -> UdemyHelper<'a> {
+    pub fn new(fs_helper: &'a dyn FsHelper) -> UdemyHelper<'a> {
         UdemyHelper { fs_helper }
     }
 

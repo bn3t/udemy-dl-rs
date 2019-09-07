@@ -14,16 +14,16 @@ pub struct CommandContext<'a> {
     pub course: Option<Course>,
     pub course_content: Option<CourseContent>,
     pub auth: Auth,
-    pub parser: &'a Parser,
-    pub client: &'a HttpClient,
+    pub parser: &'a dyn Parser,
+    pub client: &'a dyn HttpClient,
     pub udemy_helper: &'a UdemyHelper<'a>,
 }
 
 impl<'a> CommandContext<'a> {
     pub fn new(
         url: &str,
-        client: &'a HttpClient,
-        parser: &'a Parser,
+        client: &'a dyn HttpClient,
+        parser: &'a dyn Parser,
         udemy_helper: &'a UdemyHelper,
         auth: Auth,
     ) -> Result<CommandContext<'a>, Error> {
