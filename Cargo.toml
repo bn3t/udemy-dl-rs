@@ -1,6 +1,6 @@
 [package]
 name = "udemy-dl-rs"
-version = "0.10.0-next"
+version = "0.10.0"
 authors = ["Bernard Niset"]
 edition = "2018"
 
