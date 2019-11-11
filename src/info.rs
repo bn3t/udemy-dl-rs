@@ -1,9 +1,8 @@
 use crate::command::*;
 use std::any::Any;
 
-use failure::Error;
-
 use crate::model::*;
+use crate::result::Result;
 
 pub struct InfoParams {
     pub verbose: bool,
@@ -28,7 +27,7 @@ impl Command for Info {
         }
     }
 
-    fn execute(&self, context: &CommandContext) -> Result<(), Error> {
+    fn execute(&self, context: &CommandContext) -> Result<()> {
         self.print_course_content(context.course_content.as_ref().unwrap());
         Ok(())
     }

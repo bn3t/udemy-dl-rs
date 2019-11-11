@@ -1,9 +1,10 @@
 use std::any::Any;
 
-use failure::{format_err, Error};
+use failure::format_err;
 
 use crate::command::*;
 use crate::model::*;
+use crate::result::Result;
 
 pub struct CompleteParams {
     pub wanted_chapter: ObjectIndex,
@@ -34,7 +35,7 @@ impl Command for Complete {
         }
     }
 
-    fn execute(&self, context: &CommandContext) -> Result<(), Error> {
+    fn execute(&self, context: &CommandContext) -> Result<()> {
         if let Some(params) = self.params.as_ref() {
             self.complete(
                 context,
@@ -58,7 +59,7 @@ impl Complete {
         chapter: &Chapter,
         wanted_lecture: Option<ObjectIndex>,
         verbose: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if verbose {
             println!(
                 "Completing chapter {} - {}",
@@ -91,7 +92,7 @@ impl Complete {
         context: &CommandContext,
         lecture: &Lecture,
         verbose: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if verbose {
             println!("Completing lecture {}", lecture.title);
         }
@@ -118,7 +119,7 @@ impl Complete {
         wanted_chapter: ObjectIndex,
         wanted_lecture: Option<LectureId>,
         verbose: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if verbose {
             println!(
                 "Complete chapter: {}, lecture: {:?}",
