@@ -1,13 +1,14 @@
-use failure::{format_err, Error};
+use failure::format_err;
 use serde_json::Value;
 
 use crate::model::*;
+use crate::result::Result;
 use crate::utils::{json_get_string, json_get_u64};
 
 pub trait Parser {
-    fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error>;
-    fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error>;
-    fn parse_lecture_detail(&self, lecture_detail: &Value) -> Result<LectureDetail, Error>;
+    fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>>;
+    fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent>;
+    fn parse_lecture_detail(&self, lecture_detail: &Value) -> Result<LectureDetail>;
 }
 
 pub struct UdemyParser {}
@@ -20,7 +21,7 @@ impl UdemyParser {
     }
 
     /// Parse json from a specific asset.
-    fn parse_asset(&self, asset: &Value) -> Result<Asset, Error> {
+    fn parse_asset(&self, asset: &Value) -> Result<Asset> {
         let title: String = json_get_string(asset, "title")?.into();
         let asset_type: String = json_get_string(asset, "asset_type")?.into();
         let time_estimation: u64 = json_get_u64(asset, "time_estimation")?;
@@ -52,7 +53,7 @@ impl UdemyParser {
 
 impl Parser for UdemyParser {
     /// Parse subscribed courses for this user.
-    fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>, Error> {
+    fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>> {
         let results = subscribed_courses
             .get("results")
             .ok_or_else(|| format_err!("Error parsing json"))?
@@ -68,7 +69,7 @@ impl Parser for UdemyParser {
     }
 
     /// Parse full course content.
-    fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error> {
+    fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent> {
         let results = full_course
             .get("results")
             .ok_or_else(|| format_err!("Error parsing json"))?
@@ -116,7 +117,7 @@ impl Parser for UdemyParser {
         Ok(CourseContent { chapters })
     }
 
-    fn parse_lecture_detail(&self, item: &Value) -> Result<LectureDetail, Error> {
+    fn parse_lecture_detail(&self, item: &Value) -> Result<LectureDetail> {
         let asset = self.parse_asset(
             item.get("asset")
                 .ok_or_else(|| format_err!("Error parsing json (assets)"))?,

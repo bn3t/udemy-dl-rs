@@ -1,6 +1,6 @@
 use clap::{App, AppSettings, Arg, SubCommand};
 
-use failure::{format_err, Error};
+use failure::format_err;
 
 mod command;
 mod complete;
@@ -12,6 +12,7 @@ mod info;
 mod mocks;
 mod model;
 mod parser;
+mod result;
 mod test_data;
 mod udemy_helper;
 mod utils;
@@ -25,6 +26,7 @@ use http_client::UdemyHttpClient;
 use info::*;
 use model::{Auth, LectureId, ObjectIndex, VideoQuality};
 use parser::UdemyParser;
+use result::Result;
 use udemy_helper::UdemyHelper;
 
 fn main() {
@@ -195,7 +197,7 @@ fn main() {
         _ => None,
     };
 
-    let result: Result<(), Error> = match command {
+    let result: Result<()> = match command {
         Some(command) => {
             if verbose {
                 println!(

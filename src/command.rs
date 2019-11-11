@@ -1,11 +1,12 @@
 use std::any::Any;
 
-use failure::{format_err, Error};
+use failure::format_err;
 use regex::Regex;
 
 use crate::http_client::HttpClient;
 use crate::model::*;
 use crate::parser::*;
+use crate::result::Result;
 use crate::udemy_helper::*;
 
 pub struct CommandContext<'a> {
@@ -26,7 +27,7 @@ impl<'a> CommandContext<'a> {
         parser: &'a dyn Parser,
         udemy_helper: &'a UdemyHelper,
         auth: Auth,
-    ) -> Result<CommandContext<'a>, Error> {
+    ) -> Result<CommandContext<'a>> {
         let re = Regex::new(
             r"(?i)(?://(?P<portal_name>.+?).udemy.com/(?P<course_name>[a-zA-Z0-9_-]+))",
         )?;
@@ -60,5 +61,5 @@ impl<'a> CommandContext<'a> {
 
 pub trait Command {
     fn set_params(&mut self, params: &dyn Any);
-    fn execute(&self, command_context: &CommandContext) -> Result<(), Error>;
+    fn execute(&self, command_context: &CommandContext) -> Result<()>;
 }

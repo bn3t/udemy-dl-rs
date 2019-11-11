@@ -1,13 +1,13 @@
 #[cfg(test)]
 pub mod test {
 
-    use failure::Error;
     use serde_json::{to_string, Value};
 
     use crate::fs_helper::FsHelper;
     use crate::http_client::HttpClient;
     use crate::model::*;
     use crate::parser::Parser;
+    use crate::result::Result;
 
     pub static mut GETS_AS_JSON_URL: Option<Vec<String>> = None;
     pub static mut GETS_CONTENT_LENGTH_URL: Option<Vec<String>> = None;
@@ -19,7 +19,7 @@ pub mod test {
     pub struct MockHttpClient {}
 
     impl HttpClient for MockHttpClient {
-        fn get_as_text(&self, url: &str, _auth: &Auth) -> Result<String, Error> {
+        fn get_as_text(&self, url: &str, _auth: &Auth) -> Result<String> {
             println!("get_as_text url={}", url);
             unsafe {
                 match GETS_AS_JSON_URL {
@@ -31,7 +31,7 @@ pub mod test {
             };
             Ok(format!(r#"{{ "url": "{}" }}"#, url))
         }
-        fn get_content_length(&self, url: &str) -> Result<u64, Error> {
+        fn get_content_length(&self, url: &str) -> Result<u64> {
             println!("get_content_length url={}", url);
             unsafe {
                 match GETS_CONTENT_LENGTH_URL {
@@ -43,7 +43,7 @@ pub mod test {
             };
             Ok(321)
         }
-        fn get_as_data(&self, url: &str, _f: &mut dyn FnMut(u64)) -> Result<Vec<u8>, Error> {
+        fn get_as_data(&self, url: &str, _f: &mut dyn FnMut(u64)) -> Result<Vec<u8>> {
             println!("get_as_data url={}", url);
             unsafe {
                 match GETS_AS_DATA_URL {
@@ -55,7 +55,7 @@ pub mod test {
             };
             Ok(vec![])
         }
-        fn post_json(&self, url: &str, json: &Value, _auth: &Auth) -> Result<(), Error> {
+        fn post_json(&self, url: &str, json: &Value, _auth: &Auth) -> Result<()> {
             unsafe {
                 match POST_JSON_DATA_BODY {
                     Some(ref mut pjdb) => {
@@ -84,10 +84,7 @@ pub mod test {
     }
 
     impl Parser for MockParser {
-        fn parse_subscribed_courses(
-            &self,
-            subscribed_courses: &Value,
-        ) -> Result<Vec<Course>, Error> {
+        fn parse_subscribed_courses(&self, subscribed_courses: &Value) -> Result<Vec<Course>> {
             unsafe {
                 match PARSE {
                     Some(ref mut psc) => psc.push(format!("{:?}", subscribed_courses)),
@@ -102,7 +99,7 @@ pub mod test {
                 published_title: "css-the-complete-guide-incl-flexbox-grid-sass".into(),
             }])
         }
-        fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent, Error> {
+        fn parse_course_content(&self, full_course: &Value) -> Result<CourseContent> {
             unsafe {
                 match PARSE {
                     Some(ref mut psc) => psc.push(format!("{:?}", full_course)),
@@ -125,7 +122,7 @@ pub mod test {
                 }],
             })
         }
-        fn parse_lecture_detail(&self, _lecture_detail: &Value) -> Result<LectureDetail, Error> {
+        fn parse_lecture_detail(&self, _lecture_detail: &Value) -> Result<LectureDetail> {
             Ok(LectureDetail {
                 id: 4321,
                 title: "The lecture title".into(),
@@ -146,9 +143,8 @@ pub mod test {
     pub struct MockFsHelper {}
 
     impl FsHelper for MockFsHelper {
-        fn create_dir_recursive(&self, _path: &str) -> Result<(), Error> {
+        fn create_dir_recursive(&self, _path: &str) -> Result<()> {
             Ok(())
         }
     }
-
 }

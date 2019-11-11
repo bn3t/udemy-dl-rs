@@ -1,10 +1,11 @@
 #[allow(unused_imports)]
-use failure::{format_err, Error};
+use failure::format_err;
 
 use std::path::{Path, PathBuf};
 
 use crate::fs_helper::*;
 use crate::model::*;
+use crate::result::Result;
 use crate::utils::*;
 
 pub struct UdemyHelper<'a> {
@@ -21,7 +22,7 @@ impl<'a> UdemyHelper<'a> {
         target_dir: &str,
         chapter: &Chapter,
         course_name: &str,
-    ) -> Result<String, Error> {
+    ) -> Result<String> {
         let mut path_buf = PathBuf::from(target_dir);
         path_buf.push(course_name);
         path_buf.push(format!(
@@ -37,11 +38,7 @@ impl<'a> UdemyHelper<'a> {
         Ok(path)
     }
 
-    pub fn calculate_target_filename(
-        &self,
-        target_dir: &str,
-        lecture: &Lecture,
-    ) -> Result<String, Error> {
+    pub fn calculate_target_filename(&self, target_dir: &str, lecture: &Lecture) -> Result<String> {
         let mut path_buf = PathBuf::from(target_dir);
         let extension = Path::new(lecture.filename.as_str()).extension().unwrap();
         path_buf.push(format!(
@@ -58,7 +55,7 @@ impl<'a> UdemyHelper<'a> {
         Ok(path)
     }
 
-    pub fn create_target_dir(&self, path: &str) -> Result<(), Error> {
+    pub fn create_target_dir(&self, path: &str) -> Result<()> {
         self.fs_helper.create_dir_recursive(path)?;
         Ok(())
     }
@@ -71,7 +68,7 @@ mod test_udemy_helper {
     struct MockFsHelper {}
 
     impl FsHelper for MockFsHelper {
-        fn create_dir_recursive(&self, _path: &str) -> Result<(), Error> {
+        fn create_dir_recursive(&self, _path: &str) -> Result<()> {
             Ok(())
         }
     }
@@ -109,5 +106,4 @@ mod test_udemy_helper {
 
         assert!(actual.is_ok());
     }
-
 }

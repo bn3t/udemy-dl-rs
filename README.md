@@ -167,11 +167,11 @@ Run unit tests with watch
 
 ## Run info command
 
-    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken -c YourClientId info
+    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken info
 
 ## Run download command
 
-    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken -c YourClientId download -c 1
+    cargo run -- -u https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass -t YourAccessToken download -c 1
 
 ## Run download command to a location ~/Downloads
 

@@ -5,11 +5,12 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time::Instant;
 
-use failure::{format_err, Error};
+use failure::format_err;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::command::*;
 use crate::model::*;
+use crate::result::Result;
 use crate::utils::*;
 
 pub struct DownloadParams {
@@ -47,7 +48,7 @@ impl Command for Download {
         }
     }
 
-    fn execute(&self, context: &CommandContext) -> Result<(), Error> {
+    fn execute(&self, context: &CommandContext) -> Result<()> {
         // self.print_course_content(&context.course_content.unwrap());
         if let Some(params) = self.params.as_ref() {
             self.download(
@@ -75,7 +76,7 @@ impl Download {
         lecture_title: &str,
         url: &str,
         target_filename: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let content_length = context.client.get_content_length(url)?;
         let start = Instant::now();
 
@@ -107,7 +108,7 @@ impl Download {
         &self,
         download_urls: &[DownloadUrl],
         wanted_quality: Option<VideoQuality>,
-    ) -> Result<String, Error> {
+    ) -> Result<String> {
         let quality = match wanted_quality {
             Some(quality) => download_urls
                 .iter()
@@ -138,7 +139,7 @@ impl Download {
         output: &str,
         dry_run: bool,
         verbose: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if verbose {
             println!(
                 "Downloading chapter {} - {}",
@@ -192,7 +193,7 @@ impl Download {
         path: &str,
         dry_run: bool,
         verbose: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let target_filename = context
             .udemy_helper
             .calculate_target_filename(path, &lecture)
@@ -238,7 +239,7 @@ impl Download {
         output: &str,
         dry_run: bool,
         verbose: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if verbose {
             println!(
                 "Download request chapter: {:?}, lecture: {:?}, quality: {:?}, dry_run: {}",

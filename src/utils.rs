@@ -1,4 +1,5 @@
-use failure::{format_err, Error};
+use crate::result::Result;
+use failure::format_err;
 use serde_json::Value;
 
 /// Returns a cross-platform-filename-safe version of any string.
@@ -35,7 +36,7 @@ pub fn calculate_download_speed(total: u64, elapsed: u64) -> f64 {
     (total * 1000u64 / elapsed) as f64 / 1024.0 / 1024.0
 }
 
-pub fn json_get_string<'a, 'b>(value: &'a Value, key: &'b str) -> Result<&'a str, Error> {
+pub fn json_get_string<'a, 'b>(value: &'a Value, key: &'b str) -> Result<&'a str> {
     value
         .get(key)
         .ok_or_else(|| format_err!("Error parsing json ({})", key))?
@@ -43,7 +44,7 @@ pub fn json_get_string<'a, 'b>(value: &'a Value, key: &'b str) -> Result<&'a str
         .ok_or_else(|| format_err!("Error parsing json ({})", key))
 }
 
-pub fn json_get_u64(value: &Value, key: &str) -> Result<u64, Error> {
+pub fn json_get_u64(value: &Value, key: &str) -> Result<u64> {
     value
         .get(key)
         .ok_or_else(|| format_err!("Error parsing json ({})", key))?

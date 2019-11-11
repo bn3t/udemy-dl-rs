@@ -1,7 +1,8 @@
-use failure::{format_err, Error};
+use failure::format_err;
 
 use crate::command::*;
 use crate::model::*;
+use crate::result::Result;
 
 pub struct UdemyDownloader<'a> {
     command_context: &'a mut CommandContext<'a>,
@@ -14,7 +15,7 @@ impl<'a> UdemyDownloader<'a> {
         }
     }
 
-    fn get_subscribed_course(&self, verbose: bool) -> Result<Course, Error> {
+    fn get_subscribed_course(&self, verbose: bool) -> Result<Course> {
         if verbose {
             println!("Requesting subscribed courses");
         }
@@ -40,7 +41,7 @@ impl<'a> UdemyDownloader<'a> {
             })
     }
 
-    fn get_info(&self, course: &Course, verbose: bool) -> Result<String, Error> {
+    fn get_info(&self, course: &Course, verbose: bool) -> Result<String> {
         let url = format!("https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/subscriber-curriculum-items/?page_size=1400&fields[lecture]=@min,object_index,asset,supplementary_assets,sort_order,is_published,is_free&fields[quiz]=@min,object_index,title,sort_order,is_published&fields[practice]=@min,object_index,title,sort_order,is_published&fields[chapter]=@min,description,object_index,title,sort_order,is_published&fields[asset]=@min,title,filename,asset_type,external_url,length,status",
         portal_name = self.command_context.portal_name, course_id=course.id);
 
@@ -52,22 +53,22 @@ impl<'a> UdemyDownloader<'a> {
             .get_as_text(url.as_str(), &self.command_context.auth)
     }
 
-    fn parse_info(&self, info: &str) -> Result<CourseContent, Error> {
+    fn parse_info(&self, info: &str) -> Result<CourseContent> {
         let value = serde_json::from_str(info)?;
         let course_content = self.command_context.parser.parse_course_content(&value)?;
         Ok(course_content)
     }
 
-    pub fn authenticate(&mut self) -> Result<(), Error> {
+    pub fn authenticate(&mut self) -> Result<()> {
         // Previously, authentication with login form was supported
         Ok(())
     }
 
-    pub fn execute(&self, command: &dyn Command) -> Result<(), Error> {
+    pub fn execute(&self, command: &dyn Command) -> Result<()> {
         command.execute(&self.command_context)
     }
 
-    pub fn prepare_course_info(&mut self, verbose: bool) -> Result<(), Error> {
+    pub fn prepare_course_info(&mut self, verbose: bool) -> Result<()> {
         let course = self.get_subscribed_course(verbose)?;
         let info = self.get_info(&course, verbose)?;
         let course_content = self.parse_info(info.as_str())?;
