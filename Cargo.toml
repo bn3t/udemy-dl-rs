@@ -1,12 +1,13 @@
 [package]
 name = "udemy-dl-rs"
-version = "0.10.0"
+version = "0.11.0-next"
 authors = ["Bernard Niset"]
 edition = "2018"
+description="A cross-platform utility written in Rust to download courses from udemy for personal offline use."
 
 [dependencies]
 reqwest = "0.9.9"
-clap = "2.32.0"
+structopt = "0.3.9"
 failure = "0.1.5"
 regex = "1.1.0"
 serde = "1.0.86"
