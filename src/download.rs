@@ -290,7 +290,7 @@ mod test {
         let auth = Auth::with_token("blah");
 
         let mut context = CommandContext::new(
-            "https://www.udemy.com/css-the-complete-guide-incl-flexbox-grid-sass",
+            "https://www.udemy.com/course/css-the-complete-guide-incl-flexbox-grid-sass",
             &mock_http_client,
             &mock_parser,
             &udemy_helper,
