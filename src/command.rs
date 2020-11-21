@@ -29,7 +29,7 @@ impl<'a> CommandContext<'a> {
         auth: Auth,
     ) -> Result<CommandContext<'a>> {
         let re = Regex::new(
-            r"(?i)(?://(?P<portal_name>.+?).udemy.com/(?P<course_name>[a-zA-Z0-9_-]+))",
+            r"(?i)(?://(?P<portal_name>.+?).udemy.com/course/(?P<course_name>[a-zA-Z0-9_-]+))/?.*",
         )?;
         let captures = re
             .captures(url)
