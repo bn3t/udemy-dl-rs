@@ -150,11 +150,10 @@ impl Download {
             .udemy_helper
             .calculate_target_dir(output, &chapter, context.course_name.as_str())
             .unwrap();
-        if dry_run
-            || context
-                .udemy_helper
-                .create_target_dir(chapter_path.as_str())
-                .is_ok()
+        if context
+            .udemy_helper
+            .create_target_dir(chapter_path.as_str())
+            .is_ok()
         {
             chapter
                 .lectures
